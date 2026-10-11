@@ -1,15 +1,16 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3w7dx6";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3w7dx6";
-import { CircleView } from "./circle.js?v=mv3w7dx6";
-import { renderTyres } from "./tyres.js?v=mv3w7dx6";
-import { renderStrategy } from "./strategy.js?v=mv3w7dx6";
-import { renderCompare } from "./compare.js?v=mv3w7dx6";
-import { renderRewind } from "./rewind.js?v=mv3w7dx6";
-import { renderDriver } from "./driver.js?v=mv3w7dx6";
-import { Player, parseRecording } from "./player.js?v=mv3w7dx6";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3w7dx6";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3w7dx6";
+import { LiveState } from "./lib/state.js?v=mv3woo3f";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3woo3f";
+import { CircleView } from "./circle.js?v=mv3woo3f";
+import { renderTyres } from "./tyres.js?v=mv3woo3f";
+import { renderStrategy } from "./strategy.js?v=mv3woo3f";
+import { renderCompare } from "./compare.js?v=mv3woo3f";
+import { renderRewind } from "./rewind.js?v=mv3woo3f";
+import { renderDriver } from "./driver.js?v=mv3woo3f";
+import { Player, parseRecording } from "./player.js?v=mv3woo3f";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3woo3f";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3woo3f";
+import { loadStandings, renderStandings } from "./standings.js?v=mv3woo3f";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -19,6 +20,8 @@ let rcFilter = "all";
 let tab = "overview";
 let lastStrategy = 0;
 let lastSched = 0;
+let lastStand = 0;
+let standingsOk = false; // "show anyway" past the spoiler shield
 let lastSlow = 0;          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
 let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
 let dvSel = null;
@@ -280,6 +283,7 @@ function render() {
   handleRadio(v);
   checkGame(v);
   if (tab === "schedule" && Date.now() - lastSched > 5000) drawSchedule(v);
+  if (tab === "standings" && Date.now() - lastStand > 5000) drawStandings(v);
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
   if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
@@ -360,9 +364,10 @@ function renderStrip(v) {
   let html = "";
   for (let i = 1; i <= v.totalLaps; i++) {
     const ev = v.lapEvents[i];
-    const cls = ev ?? (i < v.lap ? "done" : i === v.lap ? "now" : "");
-    const label = ev === "sc" ? "safety car / VSC" : ev === "yellow" ? "yellow flag" : ev === "pits" ? "lots of pit stops" : "";
-    html += `<span class="${cls}" title="Lap ${i}${label ? ": " + label : ""}"></span>`;
+    // a lap that's happened is blue unless something happened on it; the current lap is outlined
+    const cls = [ev ?? (i < v.lap ? "done" : ""), i === v.lap ? "now" : ""].join(" ");
+    const label = ev === "sc" ? "safety car / VSC" : ev === "red" ? "red flag" : ev === "yellow" ? "yellow flag" : ev === "pits" ? "lots of pit stops" : "";
+    html += `<span class="${cls}" title="Lap ${i}${i === v.lap ? " (now)" : ""}${label ? ": " + label : ""}"></span>`;
   }
   $("lapStrip").innerHTML = html;
 }
@@ -662,6 +667,25 @@ $("tab-schedule").addEventListener("click", (e) => {
   }
 });
 
+// ---------- standings ----------
+async function drawStandings(v) {
+  lastStand = Date.now();
+  const box = $("tab-standings");
+  if (v?.mode === "replay" && $("plShield").checked && !standingsOk) {
+    box.innerHTML = `<section class="card"><h2>Standings</h2><div class="muted small">Hidden by the spoiler shield — the championship table would tell you how this race ended.</div><button class="btn" id="standShow">Show anyway</button></section>`;
+    return;
+  }
+  if (!box.innerHTML.trim()) box.innerHTML = renderStandings(null);
+  try {
+    const [st] = await Promise.all([loadStandings(), races ? null : loadSchedule().then((r) => { races = r; }).catch(() => {})]);
+    const round = races ? currentWeekend(races)?.round : null;
+    box.innerHTML = renderStandings(st, v, { live: v?.mode === "live", currentRound: round });
+  } catch {
+    box.innerHTML = `<section class="card"><div class="muted small">Couldn't load the standings right now.</div></section>`;
+  }
+}
+$("tab-standings").addEventListener("click", (e) => { if (e.target.id === "standShow") { standingsOk = true; drawStandings(view); } });
+
 // ---------- rain watch (Open-Meteo, free) ----------
 let wx = { at: 0, html: "" };
 async function updateWeather() {
@@ -694,7 +718,8 @@ $("tabs").addEventListener("click", (e) => {
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule", "standings"]) $(`tab-${t}`).hidden = t !== tab;
+  if (tab === "standings") { lastStand = 0; drawStandings(view); }
   if (tab === "schedule") { lastSched = 0; drawSchedule(view); }
   if (tab === "replays") renderReplays();
   lastStrategy = 0;

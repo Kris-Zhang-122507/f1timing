@@ -243,6 +243,30 @@ export class Race {
     this.prev = now;
   }
 
+  // What happened on each lap. Rebuilt from race control's full message history (F1 sends
+  // all of it when you connect), so a refresh doesn't lose safety cars from earlier laps.
+  lapHistory() {
+    const out = { ...this.lapEvents };
+    const msgs = list(this.state.data.RaceControlMessages?.Messages);
+    const total = Number(this.state.data.LapCount?.TotalLaps) || 0;
+    const now = this.lap || total;
+    let scFrom = null, redFrom = null;
+    const mark = (from, to, kind) => { for (let l = Math.max(1, from); l <= Math.min(to, total || to); l++) if (out[l] !== "red") out[l] = kind; };
+    for (const m of msgs) {
+      const t = String(m?.Message ?? "").toUpperCase();
+      const lap = Number(m?.Lap) || null;
+      if (!lap) continue;
+      if (/SAFETY CAR DEPLOYED/.test(t)) scFrom ??= lap;
+      else if (scFrom != null && /SAFETY CAR IN THIS LAP|VIRTUAL SAFETY CAR ENDING|VSC ENDING|TRACK CLEAR|GREEN LIGHT/.test(t)) { mark(scFrom, lap, "sc"); scFrom = null; }
+      if (/RED FLAG/.test(t)) redFrom ??= lap;
+      else if (redFrom != null && /GREEN LIGHT|PIT EXIT OPEN|RESUME/.test(t)) { mark(redFrom, lap, "red"); redFrom = null; }
+      if (/YELLOW/.test(t) && !/CLEAR/.test(t) && !out[lap]) out[lap] = "yellow";
+    }
+    if (scFrom != null) mark(scFrom, now, "sc");
+    if (redFrom != null) mark(redFrom, now, "red");
+    return out;
+  }
+
   currentStint(n) {
     const stints = list(this.state.data.TimingAppData?.Lines?.[n]?.Stints);
     return stints[stints.length - 1];
@@ -357,7 +381,7 @@ export class Race {
       track: { code: track, ...(TRACK[track] ?? { label: d.TrackStatus?.Message ?? "", tone: "grey" }) },
       clock: { remaining: clock.Remaining ?? "", utc: clock.Utc ?? "", running: !!clock.Extrapolating },
       weather: { air: w.AirTemp ?? "", track: w.TrackTemp ?? "", humidity: w.Humidity ?? "", wind: w.WindSpeed ?? "", rain: w.Rainfall === "1" || w.Rainfall === 1 },
-      lapEvents: this.lapEvents,
+      lapEvents: this.lapHistory(),
       rows,
       battles,
       story: this.story.slice(-40).reverse(),

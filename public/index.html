@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv3w7dx6">
+<link rel="stylesheet" href="style.css?v=mv3woo3f">
 </head>
 <body>
 <div class="wrap">
@@ -29,6 +29,14 @@
 
   <section class="card strip" id="stripCard" hidden>
     <div class="lapstrip" id="lapStrip"></div>
+    <div class="strip-legend">
+      <span><i style="background:#3B63C4"></i>Lap done</span>
+      <span><i style="box-shadow:0 0 0 2px #E8EAF0;background:#2A3140"></i>Current lap</span>
+      <span><i style="background:#E0A12E"></i>Safety car / VSC</span>
+      <span><i style="background:#E7C33A"></i>Yellow flag</span>
+      <span><i style="background:#FF4D4D"></i>Red flag</span>
+      <span><i style="background:#8B6CC9"></i>Pit stop rush</span>
+    </div>
   </section>
 
   <section class="card player" id="player" hidden>
@@ -62,6 +70,7 @@
     <button data-tab="rewind">Rewind</button>
     <button data-tab="driver">My driver</button>
     <button data-tab="replays">Replays</button>
+    <button data-tab="standings">Standings</button>
     <button data-tab="schedule">Schedule</button>
   </nav>
 
@@ -90,6 +99,7 @@
   <div id="tab-rewind" class="stack" hidden></div>
   <div id="tab-driver" hidden></div>
   <div id="tab-replays" class="stack" hidden></div>
+  <div id="tab-standings" class="stack" hidden></div>
   <div id="tab-schedule" class="stack" hidden>
     <section class="card" id="pitGame"></section>
     <div id="schedBox" class="stack"></div>
@@ -161,6 +171,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv3w7dx6"></script>
+<script type="module" src="app.js?v=mv3woo3f"></script>
 </body>
 </html>

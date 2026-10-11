@@ -1,0 +1,152 @@
+// Championship standings from Jolpica, live "if it finished now" projections, and the
+// (unofficial) Destructors' Championship: crashes, collisions and damage retirements.
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const API = "https://api.jolpi.ca/ergast/f1/current";
+const RACE_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
+
+// How much each kind of retirement counts in the Destructors' Championship
+const DESTRUCTION = [
+  [/accident|crash/i, 10, "crash"],
+  [/collision/i, 6, "collision"],
+  [/damage|debris|spun off|spin/i, 4, "damage / spin"],
+];
+
+let cache = null;
+async function getJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+// Jolpica returns at most 100 results per request, so page through
+async function allRaces(kind) {
+  const races = new Map();
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const d = await getJson(`${API}/${kind}.json?limit=100&offset=${offset}`);
+    for (const r of d.MRData?.RaceTable?.Races ?? []) {
+      const key = r.round;
+      const prev = races.get(key);
+      const rows = r.Results ?? r.SprintResults ?? [];
+      if (prev) prev.rows.push(...rows); else races.set(key, { round: Number(r.round), name: r.raceName, rows: [...rows] });
+    }
+    if (offset + 100 >= Number(d.MRData?.total ?? 0)) break;
+  }
+  return [...races.values()];
+}
+
+export async function loadStandings() {
+  if (cache && Date.now() - cache.at < 10 * 60e3) return cache;
+  const [ds, cs] = await Promise.all([getJson(`${API}/driverStandings.json`), getJson(`${API}/constructorStandings.json`)]);
+  const dl = ds.MRData?.StandingsTable?.StandingsLists?.[0];
+  const cl = cs.MRData?.StandingsTable?.StandingsLists?.[0];
+  let incidents = [];
+  try {
+    const races = [...await allRaces("results"), ...(await allRaces("sprint").catch(() => []))];
+    for (const race of races) for (const res of race.rows) {
+      const rule = DESTRUCTION.find(([re]) => re.test(res.status ?? ""));
+      if (rule) incidents.push({ round: race.round, race: race.name, code: res.Driver?.code, driver: `${res.Driver?.givenName ?? ""} ${res.Driver?.familyName ?? ""}`.trim(), team: res.Constructor?.name, teamId: res.Constructor?.constructorId, status: res.status, pts: rule[1], kind: rule[2] });
+    }
+  } catch { incidents = null; }
+  cache = {
+    at: Date.now(),
+    round: Number(dl?.round) || 0,
+    drivers: (dl?.DriverStandings ?? []).map((d) => ({
+      pos: Number(d.position || d.positionText) || null, points: Number(d.points), wins: Number(d.wins),
+      code: d.Driver?.code, name: `${d.Driver?.givenName ?? ""} ${d.Driver?.familyName ?? ""}`.trim(),
+      team: d.Constructors?.[d.Constructors.length - 1]?.name ?? "", teamId: d.Constructors?.[d.Constructors.length - 1]?.constructorId ?? "",
+    })),
+    teams: (cl?.ConstructorStandings ?? []).map((c) => ({ pos: Number(c.position || c.positionText) || null, points: Number(c.points), wins: Number(c.wins), name: c.Constructor?.name, id: c.Constructor?.constructorId })),
+    incidents,
+  };
+  return cache;
+}
+
+// Points each driver would score if the session finished right now
+function projection(v) {
+  if (!v || !v.totalLaps || v.quali) return null;
+  const sprint = /sprint/i.test(v.session.name);
+  const table = sprint ? SPRINT_POINTS : RACE_POINTS;
+  const pts = {};
+  for (const r of v.rows) if (r.pos < 99 && !r.out) pts[r.tla] = table[r.pos - 1] ?? 0;
+  return { pts, label: sprint ? "sprint" : "race" };
+}
+
+export function renderStandings(st, v, { live = false, currentRound = null } = {}) {
+  if (!st) return `<section class="card"><div class="muted small">Loading standings…</div></section>`;
+  const colourOf = (code) => v?.rows?.find((r) => r.tla === code)?.colour ?? "#6B7383";
+  const teamColour = (teamId) => {
+    const d = st.drivers.find((x) => x.teamId === teamId);
+    return d ? colourOf(d.code) : "#6B7383";
+  };
+  // only project when this weekend's result isn't in the standings yet
+  const proj = live && (currentRound == null || st.round < currentRound) ? projection(v) : null;
+
+  let drivers = st.drivers.map((d) => ({ ...d, add: proj?.pts[d.code] ?? 0 }));
+  let teams = st.teams.map((t) => ({ ...t, add: drivers.filter((d) => d.teamId === t.id).reduce((a, d) => a + d.add, 0) }));
+  if (proj) {
+    const rank = (arr) => [...arr].sort((a, b) => b.points + b.add - (a.points + a.add)).forEach((x, i) => { x.live = i + 1; });
+    rank(drivers); rank(teams);
+  }
+  const move = (x) => {
+    if (!proj) return "";
+    const d = x.pos - x.live;
+    return d > 0 ? `<span class="up">▲${d}</span>` : d < 0 ? `<span class="down">▼${-d}</span>` : `<span class="muted">–</span>`;
+  };
+  const leader = drivers[0]?.points ?? 0;
+  const dRows = drivers.map((d) => `<tr>
+      <td class="num pos">${d.pos ?? "–"}</td>
+      <td><i class="team" style="background:${esc(colourOf(d.code))}"></i><span class="drv">${esc(d.code ?? "")}</span> <span class="muted small">${esc(d.name)}</span></td>
+      <td class="muted small">${esc(d.team)}</td>
+      <td class="num">${d.wins || ""}</td>
+      <td class="num"><b>${d.points}</b></td>
+      <td class="num muted">${d.pos > 1 ? `−${leader - d.points}` : ""}</td>
+      ${proj ? `<td class="num ${d.add ? "good" : "muted"}">${d.add ? "+" + d.add : "–"}</td><td class="num">${move(d)}</td>` : ""}
+    </tr>`).join("");
+  const tRows = teams.map((t) => `<tr>
+      <td class="num pos">${t.pos ?? "–"}</td>
+      <td><i class="team" style="background:${esc(teamColour(t.id))}"></i><span class="drv">${esc(t.name)}</span></td>
+      <td class="num">${t.wins || ""}</td>
+      <td class="num"><b>${t.points}</b></td>
+      ${proj ? `<td class="num ${t.add ? "good" : "muted"}">${t.add ? "+" + t.add : "–"}</td><td class="num">${move(t)}</td>` : ""}
+    </tr>`).join("");
+  const projHead = proj ? `<th class="r">IF IT ENDED NOW</th><th></th>` : "";
+
+  // Destructors: group incidents by team
+  let destructors;
+  if (st.incidents == null) destructors = `<div class="muted small">Couldn't load this season's results.</div>`;
+  else {
+    const byTeam = new Map();
+    for (const i of st.incidents) {
+      const t = byTeam.get(i.teamId) ?? { name: i.team, id: i.teamId, pts: 0, list: [] };
+      t.pts += i.pts; t.list.push(i); byTeam.set(i.teamId, t);
+    }
+    const ranked = [...byTeam.values()].sort((a, b) => b.pts - a.pts);
+    destructors = ranked.length ? `<table class="timing compact"><tbody>${ranked.map((t, i) => `<tr>
+        <td class="num pos">${i + 1}</td>
+        <td><i class="team" style="background:${esc(teamColour(t.id))}"></i><span class="drv">${esc(t.name)}</span></td>
+        <td class="small muted">${t.list.map((x) => `${esc(x.code ?? x.driver)} R${x.round} (${esc(x.kind)})`).join(" · ")}</td>
+        <td class="num"><b>${t.pts}</b></td>
+      </tr>`).join("")}</tbody></table>`
+      : `<div class="muted small">Nobody has crashed out yet this season — or the results only say “Retired”. Clean sheet!</div>`;
+  }
+
+  return `${proj ? `<div class="card proj-note"><span class="badge red">LIVE</span> “If it ended now” adds the points each driver would get for their current position in this ${proj.label}.</div>` : ""}
+    <div class="standings">
+      <section class="card">
+        <div class="card-head"><h2>Drivers' Championship</h2><span class="muted small">after round ${st.round}</span></div>
+        <div class="scroll"><table class="timing compact"><thead><tr><th class="r">P</th><th>DRIVER</th><th>TEAM</th><th class="r">WINS</th><th class="r">PTS</th><th class="r">GAP</th>${projHead}</tr></thead><tbody>${dRows}</tbody></table></div>
+      </section>
+      <div class="stack">
+        <section class="card">
+          <div class="card-head"><h2>Constructors' Championship</h2><span class="muted small">after round ${st.round}</span></div>
+          <table class="timing compact"><thead><tr><th class="r">P</th><th>TEAM</th><th class="r">WINS</th><th class="r">PTS</th>${projHead}</tr></thead><tbody>${tRows}</tbody></table>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Destructors' Championship</h2><span class="muted small">unofficial · just for fun</span></div>
+          <p class="muted small">Crashes score 10, collisions 6, damage or spins 4 — counted from retirements in this season's official results. Real repair bills aren't published, so this is the honest version.</p>
+          ${destructors}
+        </section>
+      </div>
+    </div>
+    <p class="muted small">Standings from Jolpica (the community-run successor to Ergast). They update a few hours after each race.</p>`;
+}

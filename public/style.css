@@ -44,10 +44,14 @@ footer { text-align: center; }
 
 /* lap strip */
 .lapstrip { display: flex; gap: 2px; }
-.lapstrip span { flex: 1 1 0; height: 14px; border-radius: 2px; background: var(--line2); }
+.lapstrip span { flex: 1 1 0; height: 14px; border-radius: 2px; background: #2A3140; }
 .lapstrip .done { background: #3B63C4; }
-.lapstrip .now { background: var(--accent); }
-.lapstrip .sc { background: #C98A2B; }
+.lapstrip .sc { background: #E0A12E; }
+.lapstrip .red { background: #FF4D4D; }
+.lapstrip .now { box-shadow: 0 0 0 2px var(--text); }
+.strip-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+.strip-legend span { display: flex; align-items: center; gap: 6px; }
+.strip-legend i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; }
 .lapstrip .yellow { background: var(--y); }
 .lapstrip .pits { background: #8B6CC9; }
 
@@ -308,3 +312,8 @@ h2 .chip { font-size: 11px; padding: 3px 8px; vertical-align: middle; margin-lef
 /* telemetry */
 .tele-lane { display: flex; flex-direction: column; gap: 2px; }
 .tele-svg { width: 100%; display: block; background: var(--card2); border-radius: 6px; }
+
+/* standings */
+.standings { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .standings { grid-template-columns: minmax(0, 1fr); } }
+.proj-note { flex-direction: row; align-items: center; gap: 10px; font-size: 14px; color: var(--soft); }
