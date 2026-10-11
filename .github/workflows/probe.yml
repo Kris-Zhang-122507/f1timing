@@ -1,0 +1,25 @@
+# Temporary: checks whether GitHub's runners can download FIA documents. Safe to delete.
+name: Probe FIA access
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Try FIA downloads
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+          for u in \
+            "https://www.fia.com/system/files/decision-document/2026_singapore_grand_prix_-_pu_elements_used_per_driver_up_to_now.pdf" \
+            "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14/season/season-2026-2072" \
+            "https://www.fia.com/decision-document-list/nojs/60310"; do
+            for ua in "$UA" "curl/8"; do
+              code=$(curl -s -o out.bin -w "%{http_code} %{size_download}" -A "$ua" -H "Accept-Language: en" "$u" || echo "fail")
+              echo "$code | $(echo $ua | cut -c1-12) | $u" >> probe.txt
+            done
+          done
+          cat probe.txt
+          git init -q r && cd r && git config user.name probe && git config user.email probe@users.noreply.github.com
+          cp ../probe.txt . && git add probe.txt && git commit -qm probe
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/probe
