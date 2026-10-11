@@ -1,8 +1,8 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3tqc3z";
-import { Race } from "./lib/race.js?v=mv3tqc3z";
-import { renderCircle } from "./circle.js?v=mv3tqc3z";
-import { renderTyres } from "./tyres.js?v=mv3tqc3z";
+import { LiveState } from "./lib/state.js?v=mv3tx8oa";
+import { Race } from "./lib/race.js?v=mv3tx8oa";
+import { CircleView } from "./circle.js?v=mv3tx8oa";
+import { renderTyres } from "./tyres.js?v=mv3tx8oa";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -150,16 +150,31 @@ function render() {
   document.title = v.totalLaps ? `L${v.lap}/${v.totalLaps} · Undercut` : "Undercut — live timing";
 
   renderStrip(v);
-  renderRows(v);
-  renderBattles(v);
-  renderStory(v);
-  renderRcm(v);
-  if (tab === "circle") renderCircleTab(v);
+  // only draw the tab you're looking at — hidden tabs cost nothing
+  if (tab === "overview") {
+    renderRows(v);
+    renderBattles(v);
+    renderStory(v);
+    renderRcm(v);
+  }
+  if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
 }
 
-function renderCircleTab(v) {
-  $("circle").innerHTML = renderCircle(v, circleSel, pitLoss);
+// Clock for the circle: the data's own time, carried forward smoothly between updates.
+let clockBase = { now: Date.now(), at: Date.now() };
+function circleNow() {
+  const rate = view?.mode === "replay" ? (Number($("recSpeed").value) || 1) : 1;
+  return clockBase.now + (Date.now() - clockBase.at) * rate;
+}
+
+const circleView = new CircleView($("circle"), (n) => {
+  circleSel = circleSel === n ? null : n;
+  if (view) updateCircle(view);
+});
+function updateCircle(v) {
+  if (v.now && v.now !== clockBase.now) clockBase = { now: v.now, at: Date.now() };
+  circleView.setData(v, circleSel, pitLoss, circleNow);
   const sel = v.rows.find((r) => r.n === circleSel);
   $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";
   $("circleClear").hidden = !sel;
@@ -265,20 +280,15 @@ $("tabs").addEventListener("click", (e) => {
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
   for (const t of ["overview", "circle", "tyres"]) $(`tab-${t}`).hidden = t !== tab;
+  if (tab === "circle") circleView.start(); else circleView.stop();
   if (view) render();
 });
-$("circle").addEventListener("click", (e) => {
-  const hit = e.target.closest("[data-n]");
-  if (!hit) return;
-  circleSel = circleSel === hit.dataset.n ? null : hit.dataset.n;
-  if (view) renderCircleTab(view);
-});
-$("circleClear").addEventListener("click", () => { circleSel = null; if (view) renderCircleTab(view); });
+$("circleClear").addEventListener("click", () => { circleSel = null; if (view) updateCircle(view); });
 $("pitLoss").value = pitLoss;
 $("pitLoss").addEventListener("input", (e) => {
   pitLoss = Number(e.target.value) || 24;
   try { localStorage.setItem("undercut.pitLoss", String(pitLoss)); } catch {}
-  if (view) renderCircleTab(view);
+  if (view) updateCircle(view);
 });
 
 // Session clock counts down between updates
