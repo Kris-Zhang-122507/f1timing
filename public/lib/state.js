@@ -62,8 +62,9 @@ export class LiveState {
       const key = topic === "TeamRadio" ? "Captures" : "Messages";
       const prev = this.data[topic]?.[key] ?? [];
       const incoming = data?.[key];
-      const items = Array.isArray(incoming) ? incoming : Object.values(incoming ?? {});
-      this.data[topic] = { [key]: [...prev, ...items] };
+      // a full list (sent when you connect or reconnect) replaces what we had;
+      // a single new message arrives as { "<index>": message } and is added on
+      this.data[topic] = Array.isArray(incoming) ? { [key]: [...incoming] } : { [key]: [...prev, ...Object.values(incoming ?? {})] };
     } else {
       this.data[topic] = merge(this.data[topic], data);
     }

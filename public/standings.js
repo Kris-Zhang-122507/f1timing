@@ -40,11 +40,22 @@ export async function loadStandings() {
   const dl = ds.MRData?.StandingsTable?.StandingsLists?.[0];
   const cl = cs.MRData?.StandingsTable?.StandingsLists?.[0];
   let incidents = [];
+  // Preferred source: incidents found in race control messages of archived sessions
+  // (this season's official results only say "Retired", not why)
   try {
+    const r = await fetch(`data/incidents/index.json?t=${Math.floor(Date.now() / 3e5)}`);
+    const idx = r.ok ? await r.json() : null;
+    for (const s of idx?.sessions ?? []) for (const i of s.incidents) {
+      if (i.kind === "stopped" && !i.likely) continue; // a car stopping on its own is usually a failure, not a crash
+      incidents.push({ where: `${s.meeting} ${s.name}`, code: i.tla, driver: i.tla, team: i.team, teamId: i.team, colour: i.colour, status: i.message, pts: i.points, kind: i.likely ? "likely crash" : i.kind });
+    }
+    if (incidents.length) incidents.source = `${idx.sessions.length} archived sessions`;
+  } catch { /* fall back to official results */ }
+  if (!incidents.length) try {
     const races = [...await allRaces("results"), ...(await allRaces("sprint").catch(() => []))];
     for (const race of races) for (const res of race.rows) {
       const rule = DESTRUCTION.find(([re]) => re.test(res.status ?? ""));
-      if (rule) incidents.push({ round: race.round, race: race.name, code: res.Driver?.code, driver: `${res.Driver?.givenName ?? ""} ${res.Driver?.familyName ?? ""}`.trim(), team: res.Constructor?.name, teamId: res.Constructor?.constructorId, status: res.status, pts: rule[1], kind: rule[2] });
+      if (rule) incidents.push({ where: `R${race.round}`, round: race.round, race: race.name, code: res.Driver?.code, driver: `${res.Driver?.givenName ?? ""} ${res.Driver?.familyName ?? ""}`.trim(), team: res.Constructor?.name, teamId: res.Constructor?.constructorId, status: res.status, pts: rule[1], kind: rule[2] });
     }
   } catch { incidents = null; }
   cache = {
@@ -117,17 +128,17 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
   else {
     const byTeam = new Map();
     for (const i of st.incidents) {
-      const t = byTeam.get(i.teamId) ?? { name: i.team, id: i.teamId, pts: 0, list: [] };
+      const t = byTeam.get(i.teamId) ?? { name: i.team, id: i.teamId, colour: i.colour, pts: 0, list: [] };
       t.pts += i.pts; t.list.push(i); byTeam.set(i.teamId, t);
     }
     const ranked = [...byTeam.values()].sort((a, b) => b.pts - a.pts);
     destructors = ranked.length ? `<table class="timing compact"><tbody>${ranked.map((t, i) => `<tr>
         <td class="num pos">${i + 1}</td>
-        <td><i class="team" style="background:${esc(teamColour(t.id))}"></i><span class="drv">${esc(t.name)}</span></td>
-        <td class="small muted">${t.list.map((x) => `${esc(x.code ?? x.driver)} R${x.round} (${esc(x.kind)})`).join(" · ")}</td>
+        <td><i class="team" style="background:${esc(t.colour ?? teamColour(t.id))}"></i><span class="drv">${esc(t.name)}</span></td>
+        <td class="small muted">${t.list.map((x) => `${esc(x.code ?? x.driver)} · ${esc(x.where)} (${esc(x.kind)})`).join("<br>")}</td>
         <td class="num"><b>${t.pts}</b></td>
       </tr>`).join("")}</tbody></table>`
-      : `<div class="muted small">Nobody has crashed out yet this season — or the results only say “Retired”. Clean sheet!</div>`;
+      : `<div class="muted small">No incidents found yet — this fills in as sessions are archived (the first full-season run is in progress).</div>`;
   }
 
   return `${proj ? `<div class="card proj-note"><span class="badge red">LIVE</span> “If it ended now” adds the points each driver would get for their current position in this ${proj.label}.</div>` : ""}
@@ -143,7 +154,7 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
         </section>
         <section class="card">
           <div class="card-head"><h2>Destructors' Championship</h2><span class="muted small">unofficial · just for fun</span></div>
-          <p class="muted small">Crashes score 10, collisions 6, damage or spins 4 — counted from retirements in this season's official results. Real repair bills aren't published, so this is the honest version.</p>
+          <p class="muted small">Crashes score 10, a stopped car right before a safety car 8, collisions 6 — found in race control messages${st.incidents?.source ? ` from ${esc(st.incidents.source)}` : ""}. Real repair bills aren't published, so this is the honest version.</p>
           ${destructors}
         </section>
       </div>

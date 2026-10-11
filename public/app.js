@@ -1,16 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3woo3f";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3woo3f";
-import { CircleView } from "./circle.js?v=mv3woo3f";
-import { renderTyres } from "./tyres.js?v=mv3woo3f";
-import { renderStrategy } from "./strategy.js?v=mv3woo3f";
-import { renderCompare } from "./compare.js?v=mv3woo3f";
-import { renderRewind } from "./rewind.js?v=mv3woo3f";
-import { renderDriver } from "./driver.js?v=mv3woo3f";
-import { Player, parseRecording } from "./player.js?v=mv3woo3f";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3woo3f";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3woo3f";
-import { loadStandings, renderStandings } from "./standings.js?v=mv3woo3f";
+import { LiveState } from "./lib/state.js?v=mv3x4mox";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3x4mox";
+import { CircleView } from "./circle.js?v=mv3x4mox";
+import { renderTyres } from "./tyres.js?v=mv3x4mox";
+import { renderStrategy } from "./strategy.js?v=mv3x4mox";
+import { renderCompare } from "./compare.js?v=mv3x4mox";
+import { renderRewind } from "./rewind.js?v=mv3x4mox";
+import { renderDriver } from "./driver.js?v=mv3x4mox";
+import { Player, parseRecording } from "./player.js?v=mv3x4mox";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3x4mox";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3x4mox";
+import { loadStandings, renderStandings } from "./standings.js?v=mv3x4mox";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv3x4mox";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -21,6 +22,9 @@ let tab = "overview";
 let lastStrategy = 0;
 let lastSched = 0;
 let lastStand = 0;
+let lastNews = 0;
+let newsFilter = "all";
+let techKey = null;
 let standingsOk = false; // "show anyway" past the spoiler shield
 let lastSlow = 0;          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
 let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
@@ -97,10 +101,10 @@ function connectDirect() {
       if (!part) continue;
       let m;
       try { m = JSON.parse(part); } catch { continue; }
-      if (m.type === 1 && m.target === "feed") { gotData = true; feed(m.arguments[0], m.arguments[1]); }
+      if (m.type === 1 && m.target === "feed") { gotData = true; feed(m.arguments[0], m.arguments[1]); saveLocal(m.arguments[0], m.arguments[1]); }
       else if (m.type === 3 && m.invocationId === "0") {
         if (m.error) engine.status = `F1 refused the subscription: ${m.error}`;
-        else { gotData = true; for (const [t, d] of Object.entries(m.result ?? {})) feed(t, d); engine.status = "Live · direct from F1"; }
+        else { gotData = true; for (const [t, d] of Object.entries(m.result ?? {})) { feed(t, d); saveLocal(t, d); } engine.status = "Live · direct from F1"; }
       } else if (m.type === 7) engine.status = `F1 closed the connection${m.error ? ": " + m.error : ""}`;
     }
   };
@@ -114,6 +118,70 @@ function connectDirect() {
       setTimeout(connectDirect, 3000);
     }
   };
+}
+
+// ---------- saving live sessions in this browser (IndexedDB) ----------
+// Every live message is kept in the browser so you can replay the session straight away.
+// Messages are written in small chunks every few seconds; nothing leaves your computer.
+const local = { db: null, id: null, buf: [], seq: 0, meta: null };
+const localOn = () => { try { return localStorage.getItem("undercut.saveLocal") !== "off"; } catch { return true; } };
+function openDb() {
+  if (local.db) return Promise.resolve(local.db);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("undercut", 1);
+    r.onupgradeneeded = () => {
+      r.result.createObjectStore("sessions", { keyPath: "id" });
+      r.result.createObjectStore("chunks", { keyPath: ["id", "seq"] });
+    };
+    r.onsuccess = () => { local.db = r.result; res(r.result); };
+    r.onerror = () => rej(r.error);
+  });
+}
+const idbReq = (req) => new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+function saveLocal(topic, data) {
+  if (!localOn()) return;
+  local.buf.push({ t: new Date().toISOString(), topic, data });
+}
+async function flushLocal() {
+  if (!local.buf.length || typeof indexedDB === "undefined") return;
+  const info = engine?.state?.data?.SessionInfo;
+  if (!info?.Name) return; // wait until we know which session this is
+  const id = `${info.Meeting?.Name ?? "Session"} · ${info.Name} · ${(info.StartDate ?? new Date().toISOString()).slice(0, 10)}`;
+  try {
+    const db = await openDb();
+    if (local.id !== id) {
+      local.id = id;
+      local.meta = (await idbReq(db.transaction("sessions").objectStore("sessions").get(id))) ?? { id, meeting: info.Meeting?.Name ?? "", name: info.Name, first: local.buf[0].t, chunks: 0, count: 0 };
+      local.seq = local.meta.chunks;
+    }
+    const lines = local.buf.splice(0);
+    local.meta.chunks = ++local.seq;
+    local.meta.count += lines.length;
+    local.meta.last = lines[lines.length - 1].t;
+    const tx = db.transaction(["sessions", "chunks"], "readwrite");
+    tx.objectStore("chunks").put({ id, seq: local.seq, lines });
+    tx.objectStore("sessions").put(local.meta);
+  } catch (e) { console.warn("Couldn't save locally", e); }
+}
+setInterval(flushLocal, 5000);
+if (params.has("debug")) window.undercut = { saveLocal, flushLocal, localSessions, newEngine, feed, get engine() { return engine; } };
+window.addEventListener("pagehide", flushLocal);
+
+async function localSessions() {
+  try { const db = await openDb(); return (await idbReq(db.transaction("sessions").objectStore("sessions").getAll())).sort((a, b) => (b.last ?? "").localeCompare(a.last ?? "")); }
+  catch { return []; }
+}
+async function localLines(id) {
+  const db = await openDb();
+  const chunks = await idbReq(db.transaction("chunks").objectStore("chunks").getAll(IDBKeyRange.bound([id, 0], [id, Infinity])));
+  return chunks.sort((a, b) => a.seq - b.seq).flatMap((c) => c.lines);
+}
+async function deleteLocal(id) {
+  const db = await openDb();
+  const tx = db.transaction(["sessions", "chunks"], "readwrite");
+  tx.objectStore("sessions").delete(id);
+  tx.objectStore("chunks").delete(IDBKeyRange.bound([id, 0], [id, Infinity]));
+  await new Promise((r) => { tx.oncomplete = r; tx.onerror = r; });
 }
 
 // ---------- replays ----------
@@ -228,7 +296,20 @@ async function renderReplays() {
         <button class="btn primary" data-file="${esc(s.file)}" data-name="${esc(`${s.meeting} ${s.name}`)}">Watch</button>
       </div>`).join("")}
     </section>`).join("");
-  box.innerHTML = `<section class="card rp-intro">
+  const saved = await localSessions();
+  let usage = "";
+  try { const e = await navigator.storage?.estimate?.(); if (e?.usage) usage = ` · using ${(e.usage / 1048576).toFixed(0)} MB`; } catch {}
+  const fmtShort = (iso) => iso ? new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+  const localHtml = `<section class="card">
+      <div class="card-head"><h2>Saved in this browser</h2>
+        <label class="muted small shield"><input type="checkbox" id="saveLocalToggle" ${localOn() ? "checked" : ""}> Save live sessions as I watch${usage}</label></div>
+      <p class="muted small">Ready to replay straight away — from whenever you opened the page. Stays on this computer only.</p>
+      ${saved.length ? saved.map((s) => `<div class="rp-item">
+        <div class="rp-main"><div class="rp-name">${esc(s.meeting)} · ${esc(s.name)}</div><div class="muted small">${fmtShort(s.first)} → ${fmtShort(s.last)} · ${s.count.toLocaleString()} updates</div></div>
+        <div class="rp-actions"><button class="btn primary" data-local="${esc(s.id)}">Watch</button><button class="btn" data-download="${esc(s.id)}">Download</button><button class="btn" data-delete="${esc(s.id)}" aria-label="Delete ${esc(s.meeting)} ${esc(s.name)}">Delete</button></div>
+      </div>`).join("") : `<div class="muted small">Nothing saved yet — open the site during a session and it starts saving automatically.</div>`}
+    </section>`;
+  box.innerHTML = localHtml + `<section class="card rp-intro">
       <h2>Replays</h2>
       <p class="muted small">Every race, sprint and qualifying is saved here about an hour after it ends. Results stay hidden — the dots only tell you how exciting it was. Press <b>Lights out — sync now</b> when the race starts on your stream and the timing follows your video.</p>
       <label class="btn">Open a recording file…<input type="file" id="recFile2" accept=".jsonl,.json,.txt" hidden></label>
@@ -252,7 +333,28 @@ $("tab-replays").addEventListener("click", async (e) => {
     console.warn(err);
   }
 });
+$("tab-replays").addEventListener("click", async (e) => {
+  const watch = e.target.closest("[data-local]"), dl = e.target.closest("[data-download]"), del = e.target.closest("[data-delete]");
+  if (watch) {
+    watch.textContent = "Loading…";
+    const lines = await localLines(watch.dataset.local);
+    startReplay(lines.map((l) => ({ ms: Date.parse(l.t), topic: l.topic, data: l.data })).sort((a, b) => a.ms - b.ms), watch.dataset.local);
+    replayKey = null;
+    $("tabs").querySelector('[data-tab="overview"]').click();
+  }
+  if (dl) {
+    const lines = await localLines(dl.dataset.download);
+    const blob = new Blob([lines.map((l) => JSON.stringify(l)).join("\n")], { type: "application/x-ndjson" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${dl.dataset.download.replace(/[^\w-]+/g, "_")}.jsonl`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  if (del && confirm(`Delete "${del.dataset.delete}" from this browser?`)) { await deleteLocal(del.dataset.delete); renderReplays(); }
+});
 $("tab-replays").addEventListener("change", async (e) => {
+  if (e.target.id === "saveLocalToggle") { try { localStorage.setItem("undercut.saveLocal", e.target.checked ? "on" : "off"); } catch {} return; }
   if (e.target.id !== "recFile2") return;
   const f = e.target.files?.[0];
   if (f) { startReplay(parseRecording(await f.text()), f.name); $("tabs").querySelector('[data-tab="overview"]').click(); }
@@ -284,6 +386,7 @@ function render() {
   checkGame(v);
   if (tab === "schedule" && Date.now() - lastSched > 5000) drawSchedule(v);
   if (tab === "standings" && Date.now() - lastStand > 5000) drawStandings(v);
+  if ((tab === "news" || tab === "technical") && Date.now() - lastNews > 30000) drawNews();
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
   if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
@@ -686,6 +789,26 @@ async function drawStandings(v) {
 }
 $("tab-standings").addEventListener("click", (e) => { if (e.target.id === "standShow") { standingsOk = true; drawStandings(view); } });
 
+// ---------- news + technical ----------
+async function drawNews() {
+  lastNews = Date.now();
+  const news = await loadNews();
+  if (tab === "news") { $("tab-news").innerHTML = renderNews(news, newsFilter); return; }
+  if (tab !== "technical") return;
+  const idx = await loadIncidentIndex();
+  const withIncidents = (idx?.sessions ?? []).filter((s) => s.incidents.length);
+  const key = techKey ?? withIncidents[0]?.key ?? null;
+  const session = key ? await loadIncidents(key) : null;
+  if (document.activeElement?.id !== "techSession") $("tab-technical").innerHTML = renderTechnical(news, idx, session, key);
+}
+$("tab-news").addEventListener("click", (e) => {
+  const b = e.target.closest("#newsFilters button");
+  if (b) { newsFilter = b.dataset.f; drawNews(); }
+});
+$("tab-technical").addEventListener("change", (e) => {
+  if (e.target.id === "techSession") { techKey = Number(e.target.value); e.target.blur(); drawNews(); }
+});
+
 // ---------- rain watch (Open-Meteo, free) ----------
 let wx = { at: 0, html: "" };
 async function updateWeather() {
@@ -718,7 +841,8 @@ $("tabs").addEventListener("click", (e) => {
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule", "standings"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule", "standings", "news", "technical"]) $(`tab-${t}`).hidden = t !== tab;
+  if (tab === "news" || tab === "technical") drawNews();
   if (tab === "standings") { lastStand = 0; drawStandings(view); }
   if (tab === "schedule") { lastSched = 0; drawSchedule(view); }
   if (tab === "replays") renderReplays();
