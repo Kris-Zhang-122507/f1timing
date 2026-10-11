@@ -54,7 +54,19 @@ export function computeModel(v, sel, pitLoss) {
       ahead: ahead ? { tla: ahead.tla, by: rejoin - ahead.g } : null,
       behind: behind ? { tla: behind.tla, by: behind.g - rejoin } : null };
   }
-  return { cars, selCar, pit, caution, ref: v.refLap || 100 };
+  // Where is the leader right now? Minisectors fill in as a car goes round the lap
+  // (they reset at the line), so the share already completed is the leader's progress.
+  const leaderRow = v.rows.find((r) => r.n === cars[0].n);
+  let segDone = 0, segTotal = 0, stillGoing = true;
+  for (const sec of leaderRow?.sectors ?? []) {
+    for (const st of sec.seg) {
+      segTotal++;
+      if (stillGoing && st && st !== 0) segDone++;
+      else stillGoing = false;
+    }
+  }
+  const segFrac = segTotal ? segDone / segTotal : null;
+  return { cars, selCar, pit, caution, ref: v.refLap || 100, segFrac };
 }
 
 export class CircleView {
@@ -166,9 +178,19 @@ export class CircleView {
       if (this.shown[c.n] == null) this.shown[c.n] = c.g;
     });
 
+    // Until we've seen the leader cross the line, estimate their lap start from minisectors.
+    const leader = m.cars[0];
+    if (leader.lapStart) this.est = null;
+    else if (m.segFrac != null && (!this.est || this.est.n !== leader.n || this.est.seg !== m.segFrac)) {
+      const guess = nowFn() - m.segFrac * m.ref * 1000;
+      // keep the running estimate unless the minisectors say we're more than a few seconds off
+      if (!this.est || this.est.n !== leader.n || Math.abs(this.est.start - guess) > 4000) this.est = { n: leader.n, start: guess, seg: m.segFrac };
+      else this.est.seg = m.segFrac;
+    }
+
     this.lapText.textContent = v.totalLaps ? `${v.lap}/${v.totalLaps}` : "";
     this.subText.textContent = `${v.track.label} · reference lap ${fmtLap(m.ref)}`;
-    this.calText.textContent = m.cars[0].lapStart ? "" : "Placing cars once the leader next crosses the line…";
+    this.calText.textContent = m.cars[0].lapStart || this.est ? "" : "Placing cars once the leader next crosses the line…";
     if (m.pit) {
       const p = m.pit;
       this.callText.textContent = `If ${selCar.tla} pits now → P${p.pos}`;
@@ -199,7 +221,8 @@ export class CircleView {
     if (!m) return;
     const now = this.nowFn();
     const leader = m.cars[0];
-    const lf = leader.lapStart ? Math.min(0.999, Math.max(0, (now - leader.lapStart) / 1000 / m.ref)) : 0;
+    const start = leader.lapStart ?? (this.est?.n === leader.n ? this.est.start : null);
+    const lf = start ? Math.min(0.999, Math.max(0, (now - start) / 1000 / m.ref)) : 0;
 
     // ease drawn gaps towards the latest timing so cars glide instead of jumping
     const pos = m.cars.map((c) => {
