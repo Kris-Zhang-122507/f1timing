@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv3uwrkk">
+<link rel="stylesheet" href="style.css?v=mv3v6d31">
 </head>
 <body>
 <div class="wrap">
@@ -38,6 +38,9 @@
     <button data-tab="circle">Circle of doom</button>
     <button data-tab="tyres">Tyres</button>
     <button data-tab="strategy">Strategy</button>
+    <button data-tab="compare">Compare</button>
+    <button data-tab="rewind">Rewind</button>
+    <button data-tab="driver">My driver</button>
   </nav>
 
   <section class="card" id="tab-circle" hidden>
@@ -59,11 +62,14 @@
   </section>
 
   <div id="tab-strategy" hidden></div>
+  <div id="tab-compare" class="stack" hidden></div>
+  <div id="tab-rewind" class="stack" hidden></div>
+  <div id="tab-driver" hidden></div>
 
   <main class="grid" id="tab-overview">
     <section class="card table-card">
       <div class="card-head">
-        <h2>Timing</h2>
+        <h2>Timing <span class="chip amber" id="qualiBadge" hidden></span></h2>
         <div class="legend">
           <span><i class="sw p"></i>Fastest overall</span>
           <span><i class="sw g"></i>Personal best</span>
@@ -83,6 +89,7 @@
           <tbody id="rows"><tr><td colspan="13" class="muted empty">No timing yet — data starts flowing shortly before the session.</td></tr></tbody>
         </table>
       </div>
+      <div class="insights" id="insights"></div>
     </section>
 
     <aside class="side">
@@ -91,7 +98,10 @@
         <div id="battles" class="battles"><div class="muted small">Nobody within a second of the car ahead right now.</div></div>
       </section>
       <section class="card">
-        <h2>What just happened</h2>
+        <div class="card-head">
+          <h2>What just happened</h2>
+          <div class="filters" id="explain"><button data-mode="simple" class="on">Explain it simply</button><button data-mode="facts">Just the facts</button></div>
+        </div>
         <div id="story" class="feed"><div class="muted small">Pit stops, overtakes, fastest laps and safety cars will show up here.</div></div>
       </section>
       <section class="card">
@@ -118,6 +128,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv3uwrkk"></script>
+<script type="module" src="app.js?v=mv3v6d31"></script>
 </body>
 </html>

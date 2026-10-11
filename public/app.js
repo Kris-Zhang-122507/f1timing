@@ -1,9 +1,12 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3uwrkk";
-import { Race } from "./lib/race.js?v=mv3uwrkk";
-import { CircleView } from "./circle.js?v=mv3uwrkk";
-import { renderTyres } from "./tyres.js?v=mv3uwrkk";
-import { renderStrategy } from "./strategy.js?v=mv3uwrkk";
+import { LiveState } from "./lib/state.js?v=mv3v6d31";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3v6d31";
+import { CircleView } from "./circle.js?v=mv3v6d31";
+import { renderTyres } from "./tyres.js?v=mv3v6d31";
+import { renderStrategy } from "./strategy.js?v=mv3v6d31";
+import { renderCompare } from "./compare.js?v=mv3v6d31";
+import { renderRewind } from "./rewind.js?v=mv3v6d31";
+import { renderDriver } from "./driver.js?v=mv3v6d31";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -12,6 +15,10 @@ let view = null;
 let rcFilter = "all";
 let tab = "overview";
 let lastStrategy = 0;
+let lastSlow = 0;          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
+let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
+let dvSel = null;
+try { dvSel = localStorage.getItem("undercut.driver"); } catch {}
 let circleSel = null;
 let pitLoss = 24;
 try { pitLoss = Number(localStorage.getItem("undercut.pitLoss")) || 24; } catch {}
@@ -163,6 +170,16 @@ function render() {
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
   if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
+  if (["compare", "rewind", "driver"].includes(tab) && Date.now() - lastSlow > 2000) drawSlow(v);
+}
+
+// Tabs that don't need twice-a-second redraws. Skipped while you're using a dropdown.
+function drawSlow(v) {
+  if (document.activeElement?.tagName === "SELECT") return;
+  lastSlow = Date.now();
+  if (tab === "compare") $("tab-compare").innerHTML = renderCompare(v, cmpA, cmpB);
+  if (tab === "rewind") $("tab-rewind").innerHTML = renderRewind(v, rwFocus, rwMark);
+  if (tab === "driver") $("tab-driver").innerHTML = renderDriver(v, dvSel, pitLoss);
 }
 
 // Clock for the circle: the data's own time, carried forward smoothly between updates.
@@ -199,16 +216,26 @@ function renderStrip(v) {
 
 function renderRows(v) {
   if (!v.rows.length) return;
+  const q = v.quali;
+  const cutRow = q?.advance ? v.rows.find((r) => r.pos === q.advance) : null;
+  const cutTime = cutRow ? lapSeconds(cutRow.best) : null;
   $("rows").innerHTML = v.rows.map((r) => {
     const close = parseFloat(String(r.int).replace("+", "")) < 1;
-    const cls = [r.out || r.knockedOut ? "is-out" : "", r.inPit ? "in-pit" : "", close ? "close" : ""].join(" ");
-    const tag = r.out ? `<span class="tag out">OUT</span>` : r.inPit ? `<span class="tag pit">IN PIT</span>` : r.pitOut ? `<span class="tag pit">PIT EXIT</span>` : "";
+    const cls = [r.out || r.knockedOut ? "is-out" : "", r.inPit ? "in-pit" : "", close && !q ? "close" : "", q?.advance && r.pos > q.advance && !r.knockedOut ? "dropzone" : ""].join(" ");
+    let tag = r.out ? `<span class="tag out">OUT</span>` : r.knockedOut ? `<span class="tag out">KNOCKED OUT</span>` : r.inPit ? `<span class="tag pit">IN PIT</span>` : r.pitOut ? `<span class="tag pit">${q ? "OUT LAP" : "PIT EXIT"}</span>` : "";
+    if (q && cutTime && r.pos > q.advance && !r.knockedOut) {
+      const mine = lapSeconds(r.best);
+      if (!mine) tag += `<span class="tag need">no time yet</span>`;
+      else if (mine > cutTime) tag += `<span class="tag need">needs −${(mine - cutTime + 0.001).toFixed(3)}</span>`;
+    }
     const sectors = [0, 1, 2].map((i) => {
       const sec = r.sectors[i] ?? { v: "", c: "", seg: [] };
       const segs = sec.seg.map((x) => `<i class="seg ${segClass(x)}"></i>`).join("");
       return `<td class="sector"><div class="t ${sec.c ? "c-" + sec.c : ""}">${esc(sec.v) || "&nbsp;"}</div><div class="segs">${segs}</div></td>`;
     }).join("");
-    return `<tr class="${cls}">
+    const line = q?.advance && r.pos === q.advance + 1
+      ? `<tr class="cutline"><td colspan="13"><span>KNOCKOUT ZONE · top ${q.advance} go through to Q${q.part + 1}${cutRow?.best ? " · cutoff " + esc(cutRow.best) : ""}</span></td></tr>` : "";
+    return `${line}<tr class="${cls}">
       <td class="num pos">${r.pos === 99 ? "–" : r.pos}</td>
       <td class="bar"><i style="background:${esc(r.colour)}"></i></td>
       <td><span class="drv" title="${esc(r.name)} · ${esc(r.team)}">${esc(r.tla)}</span>${tag}</td>
@@ -222,9 +249,45 @@ function renderRows(v) {
       <td class="num">${r.stops}</td>
     </tr>`;
   }).join("");
+  $("qualiBadge").hidden = !q;
+  if (q) $("qualiBadge").textContent = q.part ? `Q${q.part}` : "Qualifying";
+  renderInsights(v);
+}
+
+// Three quick facts under the timing table
+function renderInsights(v) {
+  const rows = v.rows.filter((r) => r.pos < 99);
+  const bestSec = [0, 1, 2].map((i) => {
+    let best = null;
+    for (const r of rows) { const s = lapSeconds(r.bestSectors[i]); if (s && (!best || s < best.s)) best = { s, tla: r.tla }; }
+    return best;
+  });
+  const theo = bestSec.every(Boolean) ? bestSec.reduce((a, b) => a + b.s, 0) : null;
+  let speed = null;
+  for (const r of rows) { const st = parseFloat(r.bestSpeeds.st); if (st && (!speed || st > speed.v)) speed = { v: st, tla: r.tla }; }
+  let spread = null;
+  [0, 1, 2].forEach((i) => {
+    const t = rows.filter((r) => !r.inPit && !r.out).map((r) => lapSeconds(r.sectors[i]?.v)).filter(Boolean);
+    if (t.length < 5) return;
+    t.sort((a, b) => a - b);
+    const sp = t[Math.floor(t.length * 0.9)] - t[0]; // ignore the slowest 10% (traffic, pit lane)
+    if (sp >= 0.05 && (!spread || sp > spread.sp)) spread = { i, sp };
+  });
+  const fmt = (s) => { const m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(3).padStart(6, "0")}`; };
+  $("insights").innerHTML = `
+    <div class="ins"><div class="muted small caps">Theoretical best lap</div><div class="ins-val">${theo ? fmt(theo) : "—"}</div>
+      <div class="small muted">${theo ? `Best S1 (${esc(bestSec[0].tla)}) + S2 (${esc(bestSec[1].tla)}) + S3 (${esc(bestSec[2].tla)}) — nobody has put it all together` : "Needs a best time in every sector"}</div></div>
+    <div class="ins"><div class="muted small caps">Speed trap leader</div><div class="ins-val">${speed ? `${speed.v} km/h · ${esc(speed.tla)}` : "—"}</div>
+      <div class="small muted">Fastest at the main speed trap this session</div></div>
+    <div class="ins"><div class="muted small caps">Where the time is</div><div class="ins-val">${spread ? `Sector ${spread.i + 1}` : "—"}</div>
+      <div class="small muted">${spread ? `Biggest spread between cars on their latest laps — ${spread.sp.toFixed(1)}s` : "Needs sector times from most of the field"}</div></div>`;
 }
 
 function renderBattles(v) {
+  if (v.quali) {
+    $("battles").innerHTML = `<div class="muted small">Battles are for races — in qualifying everyone runs on their own. Watch the knockout zone in the timing table instead.</div>`;
+    return;
+  }
   if (!v.battles.length) {
     $("battles").innerHTML = `<div class="muted small">Nobody within a second of the car ahead right now.</div>`;
     return;
@@ -241,8 +304,18 @@ function renderBattles(v) {
       <div class="who"><i style="background:${esc(b.chaserColour)}"></i>${esc(b.chaser)} <span class="muted">→</span> <i style="background:${esc(b.aheadColour)}"></i>${esc(b.ahead)}</div>
       <div class="gap">${b.gap.toFixed(1)}s</div>
       <div class="trend ${cls}">${b.pos === 1 ? "for the lead" : `for P${b.pos}`}${trend ? " · " + trend : ""}</div>
+      ${gapSpark(b.hist, cls)}
     </div>`;
   }).join("");
+}
+
+// tiny line of the gap over their last few laps (line going down = closing)
+function gapSpark(h, cls) {
+  if (!h || h.length < 2) return "";
+  const max = Math.max(...h, 1), w = 120, ht = 26;
+  const pts = h.map((g, i) => `${((i / (h.length - 1)) * (w - 4) + 2).toFixed(1)},${(ht - 2 - (g / max) * (ht - 4)).toFixed(1)}`).join(" ");
+  const col = cls === "closing" ? "#2FD27A" : cls === "away" ? "#FF8A65" : "#6B7383";
+  return `<svg class="spark" width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"></polyline></svg>`;
 }
 
 const BADGE = { pit: "Pit", overtake: "Overtake", fastest: "Fastest lap", sc: "Safety car", red: "Red flag", green: "Green flag", out: "Retired" };
@@ -319,14 +392,46 @@ $("radio").addEventListener("click", (e) => {
   if (b) play(b.dataset.url);
 });
 
+// ---------- compare / rewind / my driver controls ----------
+const redrawSlow = () => { lastSlow = 0; if (view) drawSlow(view); };
+document.addEventListener("change", (e) => {
+  if (e.target.id === "cmpA") { cmpA = e.target.value; e.target.blur(); redrawSlow(); }
+  if (e.target.id === "cmpB") { cmpB = e.target.value; e.target.blur(); redrawSlow(); }
+  if (e.target.id === "dvSel") {
+    dvSel = e.target.value;
+    try { localStorage.setItem("undercut.driver", dvSel); } catch {}
+    e.target.blur(); redrawSlow();
+  }
+});
+$("tab-rewind").addEventListener("click", (e) => {
+  const line = e.target.closest(".rw-line");
+  if (line) { rwFocus = rwFocus === line.dataset.n ? null : line.dataset.n; redrawSlow(); return; }
+  const m = e.target.closest(".moment");
+  if (m) { const l = Number(m.dataset.lap); rwMark = rwMark === l ? null : l; redrawSlow(); return; }
+  if (e.target.id === "rwClear") { rwFocus = null; redrawSlow(); }
+});
+$("tab-driver").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-url]");
+  if (b) play(b.dataset.url);
+});
+
+// "Explain it simply" shows the plain-English notes; "Just the facts" hides them
+$("explain").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  for (const x of $("explain").children) x.classList.toggle("on", x === b);
+  document.body.classList.toggle("facts-only", b.dataset.mode === "facts");
+});
+
 // ---------- tabs + circle controls ----------
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver"]) $(`tab-${t}`).hidden = t !== tab;
   lastStrategy = 0;
+  lastSlow = 0;
   if (tab === "circle") circleView.start(); else circleView.stop();
   if (view) render();
 });

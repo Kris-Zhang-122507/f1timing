@@ -108,6 +108,7 @@ export class Race {
     this.watchingSince = null;
     this.radioLap = {};          // clip path -> lap it arrived on
     this.pitTimes = {};          // driver -> [{ lap, dur }] pit lane times seen
+    this.posHist = {};           // driver -> [{ lap, pos }] position at the end of each lap
   }
 
   get lap() {
@@ -199,6 +200,9 @@ export class Race {
         // Interval history at each lap completion (for battle trends)
         if (c.laps > p.laps) {
           this.lapStart[n] = this.now();
+          const ph = (this.posHist[n] ??= []);
+          ph.push({ lap: c.laps, pos: c.pos });
+          if (ph.length > 90) ph.shift();
           const secs = lapSeconds(c.last);
           if (secs) {
             const hist = (this.lapHist[n] ??= []);
@@ -250,8 +254,17 @@ export class Race {
     const drivers = d.DriverList ?? {};
     const best = d.TimingStats?.Lines ?? {};
 
+    // Qualifying: which part (Q1/Q2/Q3) and how many cars go through from this part
+    const part = Number(d.TimingData?.SessionPart) || 0;
+    const noEntries = list(d.TimingData?.NoEntries).map(Number);
+    const isQuali = /Qualifying|Shootout/i.test(`${d.SessionInfo?.Type ?? ""} ${d.SessionInfo?.Name ?? ""}`);
+
     const rows = Object.entries(lines).map(([n, l]) => {
       const info = drivers[n] ?? {};
+      const stats = list(l.Stats);
+      const partStats = part ? stats[part - 1] : stats[0];
+      const partBest = part ? list(l.BestLapTimes)[part - 1]?.Value : null;
+      const ts = best[n] ?? {};
       const stints = list(d.TimingAppData?.Lines?.[n]?.Stints);
       const stint = stints[stints.length - 1] ?? {};
       const sectors = list(l.Sectors).map((s) => ({
@@ -267,12 +280,12 @@ export class Race {
         name: info.FullName ?? info.LastName ?? n,
         team: info.TeamName ?? "",
         colour: info.TeamColour ? `#${info.TeamColour}` : "#888",
-        gap: l.GapToLeader ?? l.Stats?.[0]?.TimeDiffToFastest ?? "",
-        int: l.IntervalToPositionAhead?.Value ?? l.Stats?.[0]?.TimeDifftoPositionAhead ?? "",
+        gap: l.GapToLeader ?? partStats?.TimeDiffToFastest ?? "",
+        int: l.IntervalToPositionAhead?.Value ?? partStats?.TimeDifftoPositionAhead ?? "",
         catching: !!l.IntervalToPositionAhead?.Catching,
         last: l.LastLapTime?.Value ?? "",
         lastC: l.LastLapTime?.OverallFastest ? "p" : l.LastLapTime?.PersonalFastest ? "g" : "",
-        best: l.BestLapTime?.Value ?? "",
+        best: partBest || l.BestLapTime?.Value || "",
         bestC: best[n]?.PersonalBestLapTime?.Position === 1 ? "p" : "",
         sectors,
         speed: st.Value ?? "",
@@ -290,6 +303,10 @@ export class Race {
         intHist: this.intervalHist[n] ?? [],
         pitTimes: this.pitTimes[n] ?? [],
         hist: this.lapHist[n] ?? [],
+        posHist: this.posHist[n] ?? [],
+        // whole-session bests from TimingStats
+        bestSectors: list(ts.BestSectors).map((x) => x?.Value ?? ""),
+        bestSpeeds: { i1: ts.BestSpeeds?.I1?.Value ?? "", i2: ts.BestSpeeds?.I2?.Value ?? "", fl: ts.BestSpeeds?.FL?.Value ?? "", st: ts.BestSpeeds?.ST?.Value ?? "" },
         // laps run in this race on each set = current tyre age minus its age when fitted
         stints: stints.map((s) => ({ c: (s.Compound ?? "?").charAt(0), laps: Math.max(0, (Number(s.TotalLaps) || 0) - (Number(s.StartLaps) || 0)), age: Number(s.TotalLaps) || 0, isNew: s.New === "true" || s.New === true })),
       };
@@ -348,6 +365,7 @@ export class Race {
       now: this.now(),
       watchingSince: this.watchingSince,
       refLap: referenceLap(rows),
+      quali: isQuali ? { part, advance: noEntries[part] ?? null, entries: noEntries } : null,
     };
   }
 }
