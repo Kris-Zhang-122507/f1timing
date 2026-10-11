@@ -41,7 +41,7 @@ async function get(path, quiet = true) {
   const tried = [];
   for (const base of BASES) {
     try {
-      const r = await fetch(base + path, { headers: { "User-Agent": "Mozilla/5.0 (undercut fan project)" } });
+      const r = await fetch(base + path, { headers: { "User-Agent": "BestHTTP", "Accept-Encoding": "gzip, identity", Connection: "close" } });
       if (!r.ok) { tried.push(`${new URL(base).host} HTTP ${r.status}`); continue; }
       return (await r.text()).replace(/^\uFEFF/, "");
     } catch (e) {
