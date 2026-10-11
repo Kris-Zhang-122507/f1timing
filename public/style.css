@@ -463,8 +463,8 @@ html { color-scheme: dark; }
 /* edge glow: steady thin border during safety car / red flag; a single soft pulse for events */
 .edge, .edge-pulse { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 .edge { transition: box-shadow .6s ease; }
-.edge.amber { box-shadow: inset 0 0 0 2px #FFB547B0, inset 0 0 48px #FFB5471A; }
-.edge.red { box-shadow: inset 0 0 0 2px #FF4D4DC0, inset 0 0 48px #FF4D4D22; }
+.edge.amber { box-shadow: inset 0 0 0 3px #FFB547D0, inset 0 0 70px #FFB5472E; }
+.edge.red { box-shadow: inset 0 0 0 3px #FF4D4DE0, inset 0 0 70px #FF4D4D33; }
 .edge-pulse { opacity: 0; box-shadow: inset 0 0 0 3px var(--c, #FFB547), inset 0 0 90px color-mix(in srgb, var(--c, #FFB547) 35%, transparent); }
 .edge-pulse.on { animation: edge-pulse 2.6s ease-out; }
 @keyframes edge-pulse { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }

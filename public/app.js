@@ -1,19 +1,19 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4ew7we";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4ew7we";
-import { CircleView } from "./circle.js?v=mv4ew7we";
-import { renderTyres } from "./tyres.js?v=mv4ew7we";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4ew7we";
-import { renderCompare } from "./compare.js?v=mv4ew7we";
-import { renderRewind } from "./rewind.js?v=mv4ew7we";
-import { renderDriver } from "./driver.js?v=mv4ew7we";
-import { Player, parseRecording } from "./player.js?v=mv4ew7we";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4ew7we";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4ew7we";
-import { Dashboard } from "./dash.js?v=mv4ew7we";
-import { CarTelemetry } from "./telemetry.js?v=mv4ew7we";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4ew7we";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4ew7we";
+import { LiveState } from "./lib/state.js?v=mv4f3bdm";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4f3bdm";
+import { CircleView } from "./circle.js?v=mv4f3bdm";
+import { renderTyres } from "./tyres.js?v=mv4f3bdm";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4f3bdm";
+import { renderCompare } from "./compare.js?v=mv4f3bdm";
+import { renderRewind } from "./rewind.js?v=mv4f3bdm";
+import { renderDriver } from "./driver.js?v=mv4f3bdm";
+import { Player, parseRecording } from "./player.js?v=mv4f3bdm";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4f3bdm";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4f3bdm";
+import { Dashboard } from "./dash.js?v=mv4f3bdm";
+import { CarTelemetry } from "./telemetry.js?v=mv4f3bdm";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4f3bdm";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4f3bdm";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
