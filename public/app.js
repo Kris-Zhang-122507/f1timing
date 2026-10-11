@@ -1,19 +1,19 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4eq68g";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4eq68g";
-import { CircleView } from "./circle.js?v=mv4eq68g";
-import { renderTyres } from "./tyres.js?v=mv4eq68g";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4eq68g";
-import { renderCompare } from "./compare.js?v=mv4eq68g";
-import { renderRewind } from "./rewind.js?v=mv4eq68g";
-import { renderDriver } from "./driver.js?v=mv4eq68g";
-import { Player, parseRecording } from "./player.js?v=mv4eq68g";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4eq68g";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4eq68g";
-import { Dashboard } from "./dash.js?v=mv4eq68g";
-import { CarTelemetry } from "./telemetry.js?v=mv4eq68g";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4eq68g";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4eq68g";
+import { LiveState } from "./lib/state.js?v=mv4ew7we";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4ew7we";
+import { CircleView } from "./circle.js?v=mv4ew7we";
+import { renderTyres } from "./tyres.js?v=mv4ew7we";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4ew7we";
+import { renderCompare } from "./compare.js?v=mv4ew7we";
+import { renderRewind } from "./rewind.js?v=mv4ew7we";
+import { renderDriver } from "./driver.js?v=mv4ew7we";
+import { Player, parseRecording } from "./player.js?v=mv4ew7we";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4ew7we";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4ew7we";
+import { Dashboard } from "./dash.js?v=mv4ew7we";
+import { CarTelemetry } from "./telemetry.js?v=mv4ew7we";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4ew7we";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4ew7we";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -391,6 +391,7 @@ function render() {
   $("lap").innerHTML = v.totalLaps ? `Lap ${v.lap} <span>/ ${v.totalLaps}</span>` : "";
   $("track").className = `chip ${v.track.tone}`;
   document.body.dataset.flag = v.track.tone;
+  edgeFx(v);
   $("track").textContent = v.track.label;
   const w = v.weather;
   $("weather").textContent = w.air ? `Air ${w.air}° · Track ${w.track}° · ${w.rain ? "RAIN" : "Dry"}` : "";
@@ -901,6 +902,49 @@ const dash = new Dashboard({
   },
 });
 dash.wireControls();
+
+// ---------- edge glow: the screen border lights up briefly when something happens ----------
+// Safety car / VSC / red flag keep a steady thin border while they last. One pulse at a time,
+// at most every few seconds, and bursts (opening a replay, jumping ahead) are skipped.
+let fxOn = true;
+try { fxOn = localStorage.getItem("undercut.fx") !== "0"; } catch {}
+const FX = { sc: "#FFB547", red: "#FF4D4D", green: "#2FD27A", fastest: "#B47CFF", overtake: "#4A90E2", pit: "#4A90E2", out: "#FF4D4D", chequered: "#E8EAF0" };
+const fxSeen = new Set();
+let fxPrimed = false, fxLast = 0, fxStatus = "";
+function pulse(colour) {
+  const el = $("edgePulse");
+  el.style.setProperty("--c", colour);
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  fxLast = Date.now();
+}
+function edgeFx(v) {
+  const steady = { amber: "amber", red: "red" }[v.track.tone] ?? "";
+  $("edge").className = `edge ${fxOn ? steady : ""}`;
+  const fresh = v.story.filter((e) => !fxSeen.has(`${e.t}|${e.head}`));
+  for (const e of fresh) fxSeen.add(`${e.t}|${e.head}`);
+  const finished = /Finished|Ends/i.test(v.session.status ?? "");
+  const chequered = finished && fxStatus && !/Finished|Ends/i.test(fxStatus);
+  fxStatus = v.session.status ?? "";
+  if (!fxPrimed) { fxPrimed = true; return; }          // don't light up for what was already there
+  if (!fxOn || fresh.length > 3) return;              // a burst = page load or a replay jump
+  if (chequered) return pulse(FX.chequered);
+  if (Date.now() - fxLast < 4000) return;
+  const mine = v.rows.find((r) => r.n === dvSel)?.tla;
+  // what's worth a glow: flags, fastest laps, the podium changing, and anything about your driver
+  const worth = fresh.filter((e) => ["sc", "red", "green", "fastest", "out"].includes(e.type)
+    || (e.type === "overtake" && /for P[123]\b/.test(e.head))
+    || (mine && e.head.includes(mine)));
+  const order = ["red", "sc", "green", "out", "fastest", "overtake", "pit"];
+  worth.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+  if (worth[0]) pulse(FX[worth[0].type] ?? "#E8EAF0");
+}
+$("fxBtn").setAttribute("aria-pressed", String(fxOn));
+$("fxBtn").addEventListener("click", () => {
+  fxOn = !fxOn;
+  try { localStorage.setItem("undercut.fx", fxOn ? "1" : "0"); } catch {}
+  $("fxBtn").setAttribute("aria-pressed", String(fxOn));
+  if (fxOn) pulse("#FFB547"); else $("edge").className = "edge";
+});
 
 // Car telemetry panel (speed, gear, throttle, brake, RPM) — follows "My driver"
 const carTele = new CarTelemetry($("carTele"));

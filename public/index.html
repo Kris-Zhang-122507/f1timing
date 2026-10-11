@@ -8,9 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/gridstack/gridstack.min.css">
 <link rel="stylesheet" href="vendor/gridstack/gridstack-24.css">
-<link rel="stylesheet" href="style.css?v=mv4eq68g">
+<link rel="stylesheet" href="style.css?v=mv4ew7we">
 </head>
 <body>
+<div class="edge" id="edge" aria-hidden="true"></div><div class="edge-pulse" id="edgePulse" aria-hidden="true"></div>
 <div class="wrap">
   <header class="top">
     <div class="brand">UNDERCUT</div>
@@ -80,6 +81,7 @@
       <details class="menu" id="layoutMenu"><summary>Layout</summary><div class="menu-list" id="layoutList"></div></details>
       <button class="tool" id="lockBtn" aria-pressed="false" title="Stop panels moving by accident">Lock</button>
       <button class="tool" id="fullBtn" title="Full screen">Full screen</button>
+      <button class="tool" id="fxBtn" aria-pressed="true" title="Glow the screen edge when something happens">Edge glow</button>
     </div>
   </nav>
 
@@ -211,6 +213,6 @@
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
 <script src="vendor/gridstack/gridstack-all.js"></script>
-<script type="module" src="app.js?v=mv4eq68g"></script>
+<script type="module" src="app.js?v=mv4ew7we"></script>
 </body>
 </html>

@@ -459,3 +459,13 @@ html { color-scheme: dark; }
 .menu-row > button:first-child { flex: 1 1 auto; }
 .menu-list .menu-x { flex: 0 0 auto; width: 32px; text-align: center; color: var(--faint); }
 .menu-list .menu-x:hover { color: #FEB2B2; background: #2A1414; }
+
+/* edge glow: steady thin border during safety car / red flag; a single soft pulse for events */
+.edge, .edge-pulse { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.edge { transition: box-shadow .6s ease; }
+.edge.amber { box-shadow: inset 0 0 0 2px #FFB547B0, inset 0 0 48px #FFB5471A; }
+.edge.red { box-shadow: inset 0 0 0 2px #FF4D4DC0, inset 0 0 48px #FF4D4D22; }
+.edge-pulse { opacity: 0; box-shadow: inset 0 0 0 3px var(--c, #FFB547), inset 0 0 90px color-mix(in srgb, var(--c, #FFB547) 35%, transparent); }
+.edge-pulse.on { animation: edge-pulse 2.6s ease-out; }
+@keyframes edge-pulse { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .edge-pulse.on { animation-duration: 1.2s; } .edge { transition: none; } }
