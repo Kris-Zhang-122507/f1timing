@@ -152,7 +152,7 @@ async function archiveSession(meeting, ses) {
 
 async function main() {
   mkdirSync(`${OUT}/sessions`, { recursive: true });
-  const indexText = await get(`${YEAR}/Index.json`);
+  const indexText = await get(`${YEAR}/Index.json`, false);
   if (!indexText) throw new Error(`Couldn't download the ${YEAR} season index`);
   const meetings = JSON.parse(indexText).Meetings ?? [];
 
@@ -195,7 +195,10 @@ async function main() {
   }
   index.sessions.sort((a, b) => (b.startUtc ?? "").localeCompare(a.startUtc ?? ""));
   writeIfChanged(idxPath, { sessions: index.sessions });
-  log(`Done: ${added} new session(s), ${index.sessions.length} archived in total`);
+  notice(`Done: ${added} new session(s), ${index.sessions.length} archived in total`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.log(process.env.GITHUB_ACTIONS ? `::error::${e.message}` : e);
+  process.exit(1);
+});
