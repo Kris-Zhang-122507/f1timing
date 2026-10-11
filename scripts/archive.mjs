@@ -1,29 +1,31 @@
-// Downloads finished F1 sessions from F1's public timing archive and saves them as
-// replay files the site can play. Runs on GitHub Actions (see .github/workflows/archive.yml).
+// Builds replay files for finished sessions from OpenF1's free historical data, so the
+// site can replay them. Runs hourly on GitHub Actions (see .github/workflows/archive.yml).
 //
 //   node scripts/archive.mjs              this season, newest few race weekends
 //   node scripts/archive.mjs 2026 10      this season, up to 10 race weekends back
 //
 // Output (served by GitHub Pages):
-//   public/data/schedule.json            every session this season, with UTC start times
 //   public/data/sessions/index.json      archived sessions + spoiler-free "worth watching" score
-//   public/data/sessions/<key>.jsonl.gz  the replay itself (same format as our recordings)
+//   public/data/sessions/<key>.jsonl.gz  the replay itself (same format as our live recordings)
+//
+// Note: OpenF1 locks its free API while any session is live, so runs during a session
+// just skip and try again next hour.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { LiveState } from "../public/lib/state.js";
 import { Race } from "../public/lib/race.js";
+import { buildReplay, openf1 } from "../public/lib/openf1.js";
 
 const YEAR = Number(process.argv[2]) || new Date().getUTCFullYear();
 const MEETINGS_BACK = Number(process.argv[3]) || 4;
-const BASES = process.env.ARCHIVE_BASE ? [process.env.ARCHIVE_BASE] : ["https://livetiming.formula1.com/static/", "https://livetiming-mirror.fastf1.dev/static/"];
-const OUT = "public/data";
-const KEEP_TYPES = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
-const TOPICS = ["SessionInfo", "SessionStatus", "SessionData", "ExtrapolatedClock", "TrackStatus", "LapCount", "DriverList",
-  "TimingData", "TimingAppData", "TimingStats", "RaceControlMessages", "WeatherData", "TeamRadio", "PitLaneTimeCollection", "Heartbeat"];
+const OUT = "public/data/sessions";
+const KEEP = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
 
+// On GitHub Actions, "::notice::" / "::error::" lines show up as annotations on the run.
+const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
 const log = (...a) => console.log(...a);
 
-// Only rewrite a JSON file when something other than its "updated" stamp changed,
+// Only rewrite when something other than the "updated" stamp changed,
 // so the hourly job doesn't commit (and redeploy the site) for nothing.
 function writeIfChanged(path, obj) {
   const strip = (o) => JSON.stringify({ ...o, updated: undefined });
@@ -34,53 +36,14 @@ function writeIfChanged(path, obj) {
   return true;
 }
 
-// On GitHub Actions, "::notice::" lines show up as annotations on the run.
-const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
-
-async function get(path, quiet = true) {
-  const tried = [];
-  for (const base of BASES) {
-    try {
-      const r = await fetch(base + path, { headers: { "User-Agent": "BestHTTP", "Accept-Encoding": "gzip, identity", Connection: "close" } });
-      if (!r.ok) { tried.push(`${new URL(base).host} HTTP ${r.status}`); continue; }
-      return (await r.text()).replace(/^\uFEFF/, "");
-    } catch (e) {
-      tried.push(`${new URL(base).host} ${e.cause?.code ?? e.message}`);
-    }
-  }
-  if (!quiet) notice(`Couldn't fetch ${path}: ${tried.join(", ")}`);
-  return null;
-}
-
-// "+08:00:00" / "-05:00:00" -> milliseconds
-function offsetMs(s) {
-  const m = String(s ?? "").match(/^(-)?(\d+):(\d+):(\d+)/);
-  if (!m) return 0;
-  return (m[1] ? -1 : 1) * ((+m[2]) * 3600 + (+m[3]) * 60 + (+m[4])) * 1000;
-}
-const toUtc = (local, gmt) => new Date(Date.parse(local + "Z") - offsetMs(gmt)).toISOString();
-
-// "01:23:45.678" -> milliseconds
-function tsMs(ts) {
-  const m = ts.match(/^(\d+):(\d+):(\d+)\.(\d+)$/);
-  return m ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3])) * 1000 + Number(m[4].padEnd(3, "0").slice(0, 3)) : null;
-}
-
-function parseStream(text) {
-  const out = [];
-  for (const rec of text.split("\r\n")) {
-    if (rec.length < 13) continue;
-    const ms = tsMs(rec.slice(0, 12));
-    const body = rec.slice(12);
-    if (ms == null || body[0] !== "{") continue;
-    try { out.push({ ms, data: JSON.parse(body) }); } catch { /* skip broken line */ }
-  }
-  return out;
+function lapSecs(v) {
+  const m = String(v ?? "").match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+  return m ? Number(m[1] ?? 0) * 60 + Number(m[2]) : NaN;
 }
 
 // Spoiler-free rating: replays the session through the same logic the site uses and
 // counts what made it exciting, without saying who won.
-function rate(lines, type) {
+export function rate(lines, isRace) {
   const state = new LiveState();
   const race = new Race(state);
   let simNow = 0;
@@ -96,109 +59,77 @@ function rate(lines, type) {
       if (s === "5") red = true;
       lastTrack = s;
     }
-    if (l.topic === "TimingData") {
+    if (l.topic === "TimingData" && race.lap > 1) {
       const lead = Object.entries(state.data.TimingData?.Lines ?? {}).find(([, x]) => x.Position === "1")?.[0];
       if (lead && lead !== leader) { leader = lead; leadChanges++; }
     }
   }
   const v = race.view();
   const overtakes = race.story.filter((e) => e.type === "overtake").length;
-  const retirements = v.rows.filter((r) => r.out).length;
-  const p2 = v.rows.find((r) => r.pos === 2);
-  const closeFinish = p2 && parseFloat(String(p2.int).replace("+", "")) < 3;
   let score = 1;
   const reasons = [];
-  if (/Race|Sprint$/.test(type)) {
+  if (isRace) {
+    const p2 = v.rows.find((r) => r.pos === 2);
+    const closeFinish = p2 && parseFloat(String(p2.int).replace("+", "")) < 3;
     if (overtakes >= 30) { score += 2; reasons.push("lots of overtaking"); } else if (overtakes >= 12) { score += 1; reasons.push("some good passing"); } else reasons.push("not much passing");
     if (sc) { score += 0.75; reasons.push(sc > 1 ? "safety cars" : "a safety car"); }
     if (red) { score += 0.75; reasons.push("a red flag"); }
     if (leadChanges >= 2) { score += 0.75; reasons.push("changes for the lead"); }
     if (closeFinish) { score += 0.75; reasons.push("a close finish"); }
-    if (retirements >= 3) reasons.push("several retirements");
+    if (v.rows.filter((r) => r.out).length >= 3) reasons.push("several retirements");
   } else {
     const p1 = v.rows.find((r) => r.pos === 1), p3 = v.rows.find((r) => r.pos === 3);
-    const spread = p1 && p3 ? (lapSecs(p3.best) - lapSecs(p1.best)) : null;
-    if (spread != null && spread < 0.15) { score += 2; reasons.push("incredibly tight at the top"); } else if (spread != null && spread < 0.35) { score += 1; reasons.push("close at the top"); }
+    const spread = p1 && p3 ? lapSecs(p3.best) - lapSecs(p1.best) : NaN;
+    if (spread < 0.15) { score += 2; reasons.push("incredibly tight at the top"); } else if (spread < 0.35) { score += 1; reasons.push("close at the top"); }
     if (red) { score += 1; reasons.push("a red flag"); }
     if (leadChanges >= 4) { score += 1; reasons.push("provisional pole kept changing"); }
   }
   return { score: Math.max(1, Math.min(5, Math.round(score))), reasons, laps: v.totalLaps || null };
 }
-function lapSecs(v) {
-  const m = String(v ?? "").match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
-  return m ? Number(m[1] ?? 0) * 60 + Number(m[2]) : NaN;
-}
-
-async function archiveSession(meeting, ses) {
-  const streams = {};
-  for (const topic of TOPICS) {
-    const text = await get(`${ses.Path}${topic}.jsonStream`);
-    if (text) streams[topic] = parseStream(text);
-  }
-  if (!streams.TimingData?.length) return null;
-
-  // Line the stream clock up with real time using the Heartbeat's UTC stamps
-  const hb = streams.Heartbeat?.find((x) => x.data?.Utc);
-  const base = hb ? Date.parse(hb.data.Utc) - hb.ms : Date.parse(ses.startUtc) - 3600000;
-  const lines = [];
-  for (const [topic, recs] of Object.entries(streams)) {
-    if (topic === "Heartbeat") continue;
-    for (const r of recs) lines.push({ ms: r.ms, topic, data: r.data });
-  }
-  lines.sort((a, b) => a.ms - b.ms);
-  const out = lines.map((l) => ({ t: new Date(base + l.ms).toISOString(), topic: l.topic, data: l.data }));
-  const body = out.map((l) => JSON.stringify(l)).join("\n") + "\n";
-  const file = `${ses.Key}.jsonl.gz`;
-  writeFileSync(`${OUT}/sessions/${file}`, gzipSync(body, { level: 9 }));
-  const rating = rate(out, ses.Type === "Race" && /Sprint/.test(ses.Name) ? "Sprint" : ses.Name);
-  return {
-    key: ses.Key, year: YEAR, meeting: meeting.Name, country: meeting.Country?.Name ?? "", location: meeting.Location ?? "",
-    name: ses.Name, type: ses.Type, startUtc: ses.startUtc, file, messages: out.length,
-    sizeKb: Math.round(gzipSync(body, { level: 1 }).length / 1024), ...rating,
-  };
-}
 
 async function main() {
-  mkdirSync(`${OUT}/sessions`, { recursive: true });
-  const indexText = await get(`${YEAR}/Index.json`, false);
-  if (!indexText) throw new Error(`Couldn't download the ${YEAR} season index`);
-  const meetings = JSON.parse(indexText).Meetings ?? [];
-
-  // Season schedule (in UTC — the site converts to your own time zone)
-  const schedule = meetings.map((m) => ({
-    meeting: m.Name, official: m.OfficialName, country: m.Country?.Name ?? "", location: m.Location ?? "",
-    circuit: m.Circuit?.ShortName ?? "", round: m.Number ?? null,
-    sessions: (m.Sessions ?? []).filter((s) => s.Name).map((s) => ({
-      key: s.Key, name: s.Name, type: s.Type,
-      startUtc: s.StartDate ? toUtc(s.StartDate, s.GmtOffset) : null,
-      endUtc: s.EndDate ? toUtc(s.EndDate, s.GmtOffset) : null,
-    })),
-  }));
-  writeIfChanged(`${OUT}/schedule.json`, { year: YEAR, meetings: schedule });
-  log(`Schedule: ${schedule.length} meetings`);
-
-  const idxPath = `${OUT}/sessions/index.json`;
+  mkdirSync(OUT, { recursive: true });
+  const idxPath = `${OUT}/index.json`;
   const index = existsSync(idxPath) ? JSON.parse(readFileSync(idxPath, "utf8")) : { sessions: [] };
   const have = new Set(index.sessions.map((s) => s.key));
 
-  // finished sessions we want, newest race weekends first
+  let sessions;
+  try {
+    sessions = await openf1(`sessions?year=${YEAR}`);
+  } catch (e) {
+    if (/401/.test(e.message)) { notice("OpenF1 is locked while a session is live — will try again next hour."); return; }
+    throw e;
+  }
+
+  // finished sessions we want, from the newest few race weekends
   const now = Date.now();
-  const recent = meetings.filter((m) => (m.Sessions ?? []).some((s) => s.EndDate && Date.parse(toUtc(s.EndDate, s.GmtOffset)) < now)).slice(-MEETINGS_BACK);
+  const done = sessions.filter((s) => KEEP.test(s.session_name) && Date.parse(s.date_end) + 30 * 60000 < now);
+  const meetings = [...new Set(done.map((s) => s.meeting_key))].slice(-MEETINGS_BACK);
+  const todo = done.filter((s) => meetings.includes(s.meeting_key) && !have.has(s.session_key))
+    .sort((a, b) => Date.parse(b.date_start) - Date.parse(a.date_start));
+  log(`${todo.length} session(s) to archive`);
+
   let added = 0;
-  for (const m of recent.reverse()) {
-    for (const s of m.Sessions ?? []) {
-      if (!s.Path || s.Key === -1 || have.has(s.Key) || !KEEP_TYPES.test(s.Name)) continue;
-      const end = s.EndDate ? Date.parse(toUtc(s.EndDate, s.GmtOffset)) : 0;
-      if (!end || end + 45 * 60000 > now) continue; // give F1 time to finish publishing
-      s.startUtc = toUtc(s.StartDate, s.GmtOffset);
-      log(`Archiving ${m.Name} — ${s.Name} …`);
-      try {
-        const entry = await archiveSession(m, s);
-        if (entry) { index.sessions.push(entry); added++; log(`  saved ${entry.file} (${entry.messages} messages, worth watching ${entry.score}/5)`); }
-        else log("  no timing data published (yet)");
-      } catch (e) {
-        log(`  failed: ${e.message}`);
-      }
+  for (const s of todo) {
+    log(`Archiving ${s.country_name} — ${s.session_name} (${s.session_key}) …`);
+    try {
+      const { lines } = await buildReplay(s.session_key, { log });
+      if (lines.length < 100) { log("  not enough data yet"); continue; }
+      const body = lines.map((l) => JSON.stringify(l)).join("\n") + "\n";
+      const file = `${s.session_key}.jsonl.gz`;
+      const gz = gzipSync(body, { level: 9 });
+      writeFileSync(`${OUT}/${file}`, gz);
+      const isRace = /Race/i.test(s.session_type);
+      const rating = rate(lines, isRace);
+      index.sessions.push({
+        key: s.session_key, year: YEAR, meeting: s.country_name, location: s.location, circuit: s.circuit_short_name,
+        name: s.session_name, type: s.session_type, startUtc: s.date_start, file, sizeKb: Math.round(gz.length / 1024), ...rating,
+      });
+      added++;
+      notice(`Saved ${s.country_name} ${s.session_name}: ${lines.length} messages, ${Math.round(gz.length / 1024)} KB, worth watching ${rating.score}/5`);
+    } catch (e) {
+      if (/401/.test(e.message)) { notice("OpenF1 locked (a session went live) — stopping for now."); break; }
+      notice(`Couldn't archive ${s.country_name} ${s.session_name}: ${e.message}`);
     }
   }
   index.sessions.sort((a, b) => (b.startUtc ?? "").localeCompare(a.startUtc ?? ""));

@@ -326,10 +326,11 @@ export class Race {
 
     // Team radio clips are public audio files next to the session's timing data
     const base = d.SessionInfo?.Path ? `https://livetiming.formula1.com/static/${d.SessionInfo.Path}` : null;
-    const radio = base ? list(d.TeamRadio?.Captures).slice(-40).reverse().map((c) => {
+    // (replays built from OpenF1 already carry the full address)
+    const radio = list(d.TeamRadio?.Captures).filter((c) => /^https?:/.test(c?.Path ?? "") || base).slice(-40).reverse().map((c) => {
       const info = drivers[c.RacingNumber] ?? {};
-      return { url: base + c.Path, t: (c.Utc ?? "").slice(11, 19), lap: this.radioLap[c.Path] ?? null, n: c.RacingNumber, tla: info.Tla ?? c.RacingNumber, name: info.FullName ?? "", colour: info.TeamColour ? `#${info.TeamColour}` : "#888" };
-    }) : [];
+      return { url: /^https?:/.test(c.Path) ? c.Path : base + c.Path, t: (c.Utc ?? "").slice(11, 19), lap: this.radioLap[c.Path] ?? null, n: c.RacingNumber, tla: info.Tla ?? c.RacingNumber, name: info.FullName ?? "", colour: info.TeamColour ? `#${info.TeamColour}` : "#888" };
+    });
 
     const rcm = list(d.RaceControlMessages?.Messages).slice(-40).reverse().map((m) => ({
       t: (m.Utc ?? "").slice(11, 19),
