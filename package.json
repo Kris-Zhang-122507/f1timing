@@ -4,12 +4,15 @@
   "description": "F1 live timing that explains the race. Unofficial, not associated with Formula 1.",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "replay": "node server.js --replay",
     "live": "node capture.js",
-    "terminal-replay": "node capture.js --replay"
+    "terminal-replay": "node capture.js --replay",
+    "bump": "node bump.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^8.0.7",
