@@ -107,6 +107,7 @@ export class Race {
     this.lapHist = {};           // driver -> [{ lap, s (seconds), tyre }]
     this.watchingSince = null;
     this.radioLap = {};          // clip path -> lap it arrived on
+    this.pitTimes = {};          // driver -> [{ lap, dur }] pit lane times seen
   }
 
   get lap() {
@@ -131,6 +132,15 @@ export class Race {
     const track = String(d.TrackStatus?.Status ?? "");
     const lap = this.lap;
     if (this.watchingSince === null && lap > 0) this.watchingSince = lap;
+
+    // pit lane times (PitLaneTimeCollection only holds each driver's latest, so keep a log)
+    for (const [n, pt] of Object.entries(d.PitLaneTimeCollection?.PitTimes ?? {})) {
+      const dur = parseFloat(pt?.Duration);
+      if (!Number.isFinite(dur)) continue;
+      const log = (this.pitTimes[n] ??= []);
+      const lapNo = Number(pt.Lap) || lap;
+      if (!log.some((x) => x.lap === lapNo)) log.push({ lap: lapNo, dur });
+    }
 
     // remember which lap each team radio clip arrived on (the feed only gives a time)
     for (const c of list(d.TeamRadio?.Captures)) if (c?.Path && !(c.Path in this.radioLap)) this.radioLap[c.Path] = lap || null;
@@ -277,6 +287,8 @@ export class Race {
         tyreAge: stint.TotalLaps ?? "",
         tyreNew: stint.New === "true" || stint.New === true,
         lapStart: this.lapStart[n] ?? null,
+        intHist: this.intervalHist[n] ?? [],
+        pitTimes: this.pitTimes[n] ?? [],
         hist: this.lapHist[n] ?? [],
         // laps run in this race on each set = current tyre age minus its age when fitted
         stints: stints.map((s) => ({ c: (s.Compound ?? "?").charAt(0), laps: Math.max(0, (Number(s.TotalLaps) || 0) - (Number(s.StartLaps) || 0)), age: Number(s.TotalLaps) || 0, isNew: s.New === "true" || s.New === true })),

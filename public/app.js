@@ -1,8 +1,9 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3ur5nk";
-import { Race } from "./lib/race.js?v=mv3ur5nk";
-import { CircleView } from "./circle.js?v=mv3ur5nk";
-import { renderTyres } from "./tyres.js?v=mv3ur5nk";
+import { LiveState } from "./lib/state.js?v=mv3uwrkk";
+import { Race } from "./lib/race.js?v=mv3uwrkk";
+import { CircleView } from "./circle.js?v=mv3uwrkk";
+import { renderTyres } from "./tyres.js?v=mv3uwrkk";
+import { renderStrategy } from "./strategy.js?v=mv3uwrkk";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -10,6 +11,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 let view = null;
 let rcFilter = "all";
 let tab = "overview";
+let lastStrategy = 0;
 let circleSel = null;
 let pitLoss = 24;
 try { pitLoss = Number(localStorage.getItem("undercut.pitLoss")) || 24; } catch {}
@@ -60,7 +62,7 @@ setInterval(() => {
 }, 500);
 
 const TOPICS = ["Heartbeat", "SessionInfo", "SessionStatus", "SessionData", "ExtrapolatedClock", "TrackStatus", "LapCount",
-  "DriverList", "TimingData", "TimingAppData", "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio"];
+  "DriverList", "TimingData", "TimingAppData", "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio", "PitLaneTimeCollection"];
 let directSocket = null;
 
 function connectDirect() {
@@ -160,6 +162,7 @@ function render() {
   handleRadio(v);
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
+  if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
 }
 
 // Clock for the circle: the data's own time, carried forward smoothly between updates.
@@ -322,7 +325,8 @@ $("tabs").addEventListener("click", (e) => {
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy"]) $(`tab-${t}`).hidden = t !== tab;
+  lastStrategy = 0;
   if (tab === "circle") circleView.start(); else circleView.stop();
   if (view) render();
 });
