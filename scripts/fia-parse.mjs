@@ -11,10 +11,15 @@ export const PU_ALLOWANCE = { ICE: 4, TC: 4, EXH: 4, "MGU-K": 3, ES: 3, "PU-CE":
 export function parsePu(text) {
   const rows = [];
   for (const line of text.split("\n")) {
-    const m = line.match(/^\s*(\d{1,2})\s{2,}(.+?)\s{2,}(\S.*?)\s{2,}(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
+    // "06   Red Bull Racing RB Ford   Isack Hadjar   7  6  6  4  4  4  7" (numbers can carry a footnote mark)
+    const m = line.match(/^\s*(\d{1,2})\s{2,}(.+?)\s+((?:\d+[*()a-z]{0,3}\s+){6}\d+[*()a-z]{0,3})\s*$/i);
     if (!m) continue;
-    const used = Object.fromEntries(PU_ELEMENTS.map((e, i) => [e, Number(m[4 + i])]));
-    rows.push({ n: String(Number(m[1])), car: m[2].trim(), driver: m[3].trim(), used });
+    const names = m[2].trim().split(/\s{2,}/);
+    if (names.length < 2) continue;
+    const nums = m[3].trim().split(/\s+/).map((x) => parseInt(x, 10));
+    if (nums.length !== 7 || nums.some((x) => !Number.isFinite(x))) continue;
+    const used = Object.fromEntries(PU_ELEMENTS.map((e, i) => [e, nums[i]]));
+    rows.push({ n: String(Number(m[1])), car: names.slice(0, -1).join(" "), driver: names.at(-1), used });
   }
   return rows;
 }

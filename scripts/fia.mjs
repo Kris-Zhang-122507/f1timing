@@ -19,6 +19,7 @@ const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const log = (...a) => console.log(...a);
+const PARSER = 2; // bump when the parsers change, so cached events are read again
 
 // curl rather than fetch: the FIA site answers curl reliably but can stall Node's fetch
 async function get(url, binary = false) {
@@ -75,7 +76,7 @@ async function main() {
     const file = `${EVENTS}/${slug(name)}.json`;
     const cached = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
     // documents can still change during and just after the newest two weekends
-    if (cached && i >= 2 && cached.pu?.length && cached.upgradesChecked) { events.push({ ...cached, round }); continue; }
+    if (cached && i >= 2 && cached.pu?.length && cached.upgradesChecked && cached.parser === PARSER) { events.push({ ...cached, round }); continue; }
     log(`R${round} ${name}: checking documents…`);
     const page = await get(`${seasonUrl}/event/${encodeURIComponent(name)}`);
     await pause(1500);
@@ -103,6 +104,7 @@ async function main() {
     }
     if (teams.size) ev.upgrades = [...teams.entries()].map(([team, updates]) => ({ team, updates }));
     ev.upgradesChecked = cpUrls.length > 0;
+    ev.parser = PARSER;
     writeFileSync(file, JSON.stringify(ev));
     log(`R${round} ${name}: ${ev.pu.length} drivers' PU usage, ${ev.upgrades.reduce((a, t) => a + t.updates.length, 0)} upgrades`);
     events.push(ev);
