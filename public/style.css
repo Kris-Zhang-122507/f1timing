@@ -169,3 +169,5 @@ footer { text-align: center; }
 .radio-item .meta { font: 12px "JetBrains Mono", monospace; color: var(--faint); }
 .radio-item.new .who::after { content: "NEW"; font: 600 10px "Barlow", sans-serif; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 4px; background: #3A2A0A; color: var(--accent-soft); }
 .autoplay { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.c-debug { font: 12px "JetBrains Mono", monospace; fill: #FFD08A; text-anchor: start !important; }

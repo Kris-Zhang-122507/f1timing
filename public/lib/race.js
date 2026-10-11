@@ -22,15 +22,13 @@ export function lapSeconds(v) {
   return m ? (Number(m[1] ?? 0) * 60 + Number(m[2])) : null;
 }
 
-// A typical green-flag lap right now: median of recent laps, ignoring slow outliers.
+// How long a lap is taking right now: the median of every running car's most recent lap.
+// Using the latest lap (not a "best" pace) means it slows down automatically under a
+// safety car or in the rain; a few in/out laps don't move the median.
 function referenceLap(rows) {
-  const recent = [];
-  for (const r of rows) for (const h of r.hist.slice(-5)) recent.push(h.s);
-  if (recent.length < 5) for (const r of rows) { const s = lapSeconds(r.last); if (s) recent.push(s); }
-  if (!recent.length) return null;
-  const best = Math.min(...recent);
-  const ok = recent.filter((s) => s < best * 1.07).sort((a, b) => a - b);
-  return ok[Math.floor(ok.length / 2)] ?? null;
+  const laps = rows.filter((r) => !r.out && !r.inPit).map((r) => lapSeconds(r.last)).filter((s) => s && s > 40 && s < 400).sort((a, b) => a - b);
+  if (!laps.length) return null;
+  return laps[Math.floor(laps.length / 2)];
 }
 
 const list = (v) => (Array.isArray(v) ? v : Object.values(v ?? {}));

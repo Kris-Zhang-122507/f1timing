@@ -109,6 +109,7 @@ export class CircleView {
     this.callText = el("text", { x: C, y: C + 50, class: "c-call" }, svg);
     this.nearText = el("text", { x: C, y: C + 72, class: "c-sub" }, svg);
     this.lossText = el("text", { x: C, y: C + 92, class: "c-sub" }, svg);
+    this.debug = new URLSearchParams(location.search).has("debug") ? el("text", { x: 12, y: 20, class: "c-debug" }, svg) : null;
     this.dotLayer = el("g", {}, svg);
     this.labelLayer = el("g", {}, svg);
     this.box.appendChild(svg);
@@ -260,6 +261,10 @@ export class CircleView {
       if (i > 0 && c.int != null && c.int < 1 && !c.inPit && !pos[i - 1].c.inPit) battles += arc(R, pos[i - 1].f, f) + " ";
     });
     this.leaders.setAttribute("d", leaders);
+    if (this.debug) {
+      const age = start ? ((now - start) / 1000).toFixed(1) : "—";
+      this.debug.textContent = `leader ${leader.tla} · ${leader.lapStart ? "line seen" : this.est ? "estimated" : "unknown"} · ${age}s into lap · ref ${m.ref.toFixed(1)}s · progress ${(lf * 100).toFixed(0)}% · minisectors ${m.segFrac == null ? "—" : (m.segFrac * 100).toFixed(0) + "%"}`;
+    }
     this.battles.setAttribute("d", battles);
 
     if (m.pit && m.selCar) {
