@@ -34,13 +34,21 @@ function writeIfChanged(path, obj) {
   return true;
 }
 
-async function get(path) {
+// On GitHub Actions, "::notice::" lines show up as annotations on the run.
+const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
+
+async function get(path, quiet = true) {
+  const tried = [];
   for (const base of BASES) {
     try {
-      const r = await fetch(base + path, { headers: { "User-Agent": "undercut-archive/1.0" } });
-      if (r.ok) return (await r.text()).replace(/^﻿/, "");
-    } catch { /* try the mirror */ }
+      const r = await fetch(base + path, { headers: { "User-Agent": "Mozilla/5.0 (undercut fan project)" } });
+      if (!r.ok) { tried.push(`${new URL(base).host} HTTP ${r.status}`); continue; }
+      return (await r.text()).replace(/^\uFEFF/, "");
+    } catch (e) {
+      tried.push(`${new URL(base).host} ${e.cause?.code ?? e.message}`);
+    }
   }
+  if (!quiet) notice(`Couldn't fetch ${path}: ${tried.join(", ")}`);
   return null;
 }
 
