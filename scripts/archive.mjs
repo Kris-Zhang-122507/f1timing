@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { LiveState } from "../public/lib/state.js";
 import { Race } from "../public/lib/race.js";
-import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry, gpsReplay } from "../public/lib/openf1.js";
+import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry, gpsReplay, startingGrid } from "../public/lib/openf1.js";
 import { extractIncidents, analyseCrash } from "./incidents.mjs";
 
 const YEAR = Number(process.argv[2]) || new Date().getUTCFullYear();
@@ -149,7 +149,10 @@ async function main() {
   const done = sessions.filter((s) => KEEP.test(s.session_name) && Date.parse(s.date_end) + 30 * 60000 < now);
   const meetings = [...new Set(done.map((s) => s.meeting_key))].slice(-MEETINGS_BACK);
   const stale = new Set(index.sessions.filter((e) => (e.v ?? 1) < FORMAT).map((e) => e.key));
-  const todo = done.filter((s) => (meetings.includes(s.meeting_key) && !have.has(s.session_key)) || stale.has(s.session_key))
+  // plus a few older sessions that are still missing (earlier runs may have failed on them),
+  // so the archive fills back to the start of the season over a few hours
+  const backfill = done.filter((s) => !meetings.includes(s.meeting_key) && !have.has(s.session_key)).slice(-3);
+  const todo = [...done.filter((s) => (meetings.includes(s.meeting_key) && !have.has(s.session_key)) || stale.has(s.session_key)), ...backfill]
     .sort((a, b) => Date.parse(b.date_start) - Date.parse(a.date_start));
   log(`${todo.length} session(s) to archive (${stale.size} rebuilt in the newer format)`);
 
@@ -172,6 +175,7 @@ async function main() {
       const fresh = {
         key: s.session_key, year: YEAR, meeting: s.country_name, location: s.location, circuit: s.circuit_short_name,
         name: s.session_name, type: s.session_type, startUtc: s.date_start, file, sizeKb: Math.round(gz.length / 1024), ...rating, v: FORMAT,
+        grid: lines.some((l) => l.topic === "TimingAppData" && Object.values(l.data?.Lines ?? {})[0]?.GridPos != null),
       };
       if (old) {
         // rebuilding an older file: keep its telemetry, redo its incidents
@@ -293,6 +297,29 @@ async function main() {
       }
     }
   } catch (e) { log(`  no championship data: ${e.message}`); }
+
+  // races archived before the grid was found: add it to the saved replay (cheap, no rebuild)
+  for (const entry of index.sessions) {
+    if (entry.grid || !/^(Race|Sprint)$/.test(entry.name) || !existsSync(`${OUT}/${entry.file}`)) continue;
+    const s = sessions.find((x) => x.session_key === entry.key);
+    if (!s) continue;
+    try {
+      const grid = await startingGrid(s);
+      await pause(WAIT * 2);
+      if (!grid.length) continue;
+      const lines = gunzipSync(readFileSync(`${OUT}/${entry.file}`)).toString("utf8").split("\n").filter(Boolean);
+      const t = new Date(Date.parse(s.date_start) - 50000).toISOString();
+      const add = grid.filter((g) => g.position).map((g) => JSON.stringify({ t, topic: "TimingAppData", data: { Lines: { [g.driver_number]: { GridPos: String(g.position) } } } }));
+      const at = lines.findIndex((l) => JSON.parse(l).t > t);
+      lines.splice(at < 0 ? lines.length : at, 0, ...add);
+      writeFileSync(`${OUT}/${entry.file}`, gzipSync(lines.join("\n") + "\n", { level: 9 }));
+      entry.grid = true;
+      log(`Starting grid added to ${entry.meeting} ${entry.name}`);
+    } catch (e) {
+      if (/401/.test(e.message)) break;
+      log(`  no grid for ${entry.key}: ${e.message}`);
+    }
+  }
 
   // older archived sessions that don't have incident data yet: work it out from the saved replay
   for (const entry of index.sessions) {

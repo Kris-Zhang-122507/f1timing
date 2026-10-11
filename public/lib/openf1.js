@@ -40,6 +40,15 @@ export function trackFromMessage(msg) {
   return null;
 }
 
+// The starting grid for a race or sprint: OpenF1 lists it under the qualifying session that set
+// it (Qualifying for the race, Sprint Qualifying / Shootout for the sprint).
+export async function startingGrid(session, { fetchFn = fetch } = {}) {
+  const [grids, sessions] = [await openf1(`starting_grid?meeting_key=${session.meeting_key}`, fetchFn), await openf1(`sessions?meeting_key=${session.meeting_key}`, fetchFn)];
+  const sprint = /sprint/i.test(session.session_name);
+  const q = sessions.find((s) => (sprint ? /^Sprint (Qualifying|Shootout)$/i : /^Qualifying$/i).test(s.session_name));
+  return q ? grids.filter((g) => g.session_key === q.session_key) : [];
+}
+
 // fetchFn lets the archive job add its own headers/retries; `wait` spaces requests out
 // to stay inside OpenF1's free limit (30 requests a minute).
 export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof process !== "undefined" && process.env?.OPENF1_WAIT ? Number(process.env.OPENF1_WAIT) : 2200), log = () => {} } = {}) {
@@ -62,7 +71,9 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
   // newer endpoints: official overtakes, the starting grid and the final result (races only)
   const extra = async (ep) => (isRace ? get(ep).catch(() => []) : []);
   const overtakes = await extra("overtakes");
-  const grid = await extra("starting_grid");
+  // OpenF1 files the grid under the qualifying session that set it, so look it up by meeting
+  const grid = isRace ? await startingGrid(session, { fetchFn }).catch(() => []) : [];
+  if (isRace) await pause();
   const result = await extra("session_result");
 
   const start = Date.parse(session.date_start), end = Date.parse(session.date_end);
