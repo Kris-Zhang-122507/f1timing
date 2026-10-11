@@ -1,12 +1,12 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3v6d31";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3v6d31";
-import { CircleView } from "./circle.js?v=mv3v6d31";
-import { renderTyres } from "./tyres.js?v=mv3v6d31";
-import { renderStrategy } from "./strategy.js?v=mv3v6d31";
-import { renderCompare } from "./compare.js?v=mv3v6d31";
-import { renderRewind } from "./rewind.js?v=mv3v6d31";
-import { renderDriver } from "./driver.js?v=mv3v6d31";
+import { LiveState } from "./lib/state.js?v=mv3va7yn";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3va7yn";
+import { CircleView } from "./circle.js?v=mv3va7yn";
+import { renderTyres } from "./tyres.js?v=mv3va7yn";
+import { renderStrategy } from "./strategy.js?v=mv3va7yn";
+import { renderCompare } from "./compare.js?v=mv3va7yn";
+import { renderRewind } from "./rewind.js?v=mv3va7yn";
+import { renderDriver } from "./driver.js?v=mv3va7yn";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

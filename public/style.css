@@ -45,7 +45,7 @@ footer { text-align: center; }
 /* lap strip */
 .lapstrip { display: flex; gap: 2px; }
 .lapstrip span { flex: 1 1 0; height: 14px; border-radius: 2px; background: var(--line2); }
-.lapstrip .done { background: #4A5568; }
+.lapstrip .done { background: #3B63C4; }
 .lapstrip .now { background: var(--accent); }
 .lapstrip .sc { background: #C98A2B; }
 .lapstrip .yellow { background: var(--y); }
