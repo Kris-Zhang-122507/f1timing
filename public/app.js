@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3x4mox";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3x4mox";
-import { CircleView } from "./circle.js?v=mv3x4mox";
-import { renderTyres } from "./tyres.js?v=mv3x4mox";
-import { renderStrategy } from "./strategy.js?v=mv3x4mox";
-import { renderCompare } from "./compare.js?v=mv3x4mox";
-import { renderRewind } from "./rewind.js?v=mv3x4mox";
-import { renderDriver } from "./driver.js?v=mv3x4mox";
-import { Player, parseRecording } from "./player.js?v=mv3x4mox";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3x4mox";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3x4mox";
-import { loadStandings, renderStandings } from "./standings.js?v=mv3x4mox";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv3x4mox";
+import { LiveState } from "./lib/state.js?v=mv3xw3wn";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3xw3wn";
+import { CircleView } from "./circle.js?v=mv3xw3wn";
+import { renderTyres } from "./tyres.js?v=mv3xw3wn";
+import { renderStrategy } from "./strategy.js?v=mv3xw3wn";
+import { renderCompare } from "./compare.js?v=mv3xw3wn";
+import { renderRewind } from "./rewind.js?v=mv3xw3wn";
+import { renderDriver } from "./driver.js?v=mv3xw3wn";
+import { Player, parseRecording } from "./player.js?v=mv3xw3wn";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3xw3wn";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3xw3wn";
+import { loadStandings, renderStandings } from "./standings.js?v=mv3xw3wn";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv3xw3wn";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -146,6 +146,10 @@ async function flushLocal() {
   if (!local.buf.length || typeof indexedDB === "undefined") return;
   const info = engine?.state?.data?.SessionInfo;
   if (!info?.Name) return; // wait until we know which session this is
+  // Only keep what's recorded while the session is running. Opening the page after the
+  // flag would otherwise save a "replay" that only shows the final result.
+  const status = engine?.state?.data?.SessionStatus?.Status ?? "";
+  if (/Finished|Finalised|Ends/i.test(status) && !local.meta) { local.buf.length = 0; return; }
   const id = `${info.Meeting?.Name ?? "Session"} · ${info.Name} · ${(info.StartDate ?? new Date().toISOString()).slice(0, 10)}`;
   try {
     const db = await openDb();
