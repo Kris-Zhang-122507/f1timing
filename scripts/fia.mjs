@@ -20,14 +20,18 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const log = (...a) => console.log(...a);
 
+// curl rather than fetch: the FIA site answers curl reliably but can stall Node's fetch
 async function get(url, binary = false) {
   for (let i = 0; i < 3; i++) {
     try {
-      const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en" }, signal: AbortSignal.timeout(45000) });
-      if (r.ok) return binary ? Buffer.from(await r.arrayBuffer()) : r.text();
-      log(`  ${r.status} ${url}`);
-      if (r.status === 404) return null;
-    } catch (e) { log(`  ${e.message} ${url}`); }
+      const out = execFileSync("curl", ["-sSL", "--max-time", "60", "-A", UA, "-H", "Accept-Language: en", "-w", "\n%{http_code}", url], { maxBuffer: 64 * 1024 * 1024 });
+      const cut = out.lastIndexOf(10); // the status code is on the last line
+      const code = Number(out.subarray(cut + 1).toString());
+      const body = out.subarray(0, cut);
+      if (code >= 200 && code < 300) return binary ? body : body.toString("utf8");
+      log(`  ${code} ${url}`);
+      if (code === 404) return null;
+    } catch (e) { log(`  ${String(e.message).split("\n")[0]} ${url}`); }
     await pause(3000 * (i + 1));
   }
   return null;
@@ -36,10 +40,9 @@ async function get(url, binary = false) {
 // short team names, matching the rest of the site
 export function teamName(raw) {
   const t = String(raw ?? "").toLowerCase();
-  const map = [["mclaren", "McLaren"], ["mercedes", "Mercedes"], ["racing bulls", "Racing Bulls"], ["rb f1", "Racing Bulls"], ["red bull", "Red Bull Racing"],
-    ["ferrari", "Ferrari"], ["williams", "Williams"], ["aston", "Aston Martin"], ["haas", "Haas"], ["alpine", "Alpine"], ["audi", "Audi"], ["sauber", "Audi"], ["cadillac", "Cadillac"]];
-  // "McLaren Mercedes" etc. list the engine second, so check the start of the name first
-  for (const [k, v] of map) if (t.startsWith(k)) return v;
+  // team names first, engine makers last ("Atlassian Williams Mercedes" is Williams, "Haas Ferrari" is Haas)
+  const map = [["mclaren", "McLaren"], ["racing bulls", "Racing Bulls"], ["visa cash app", "Racing Bulls"], ["red bull", "Red Bull Racing"], ["williams", "Williams"],
+    ["aston", "Aston Martin"], ["haas", "Haas"], ["alpine", "Alpine"], ["audi", "Audi"], ["sauber", "Audi"], ["cadillac", "Cadillac"], ["mercedes", "Mercedes"], ["ferrari", "Ferrari"]];
   for (const [k, v] of map) if (t.includes(k)) return v;
   return String(raw ?? "").trim();
 }

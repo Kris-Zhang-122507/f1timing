@@ -10,10 +10,9 @@ const TEAM = {
 };
 export function teamKey(name) {
   const t = String(name ?? "").toLowerCase();
-  for (const k of Object.keys(TEAM)) if (t.startsWith(k.toLowerCase())) return k;
-  if (/racing bulls|rb\b|vcarb/.test(t)) return "Racing Bulls";
-  if (/red bull/.test(t)) return "Red Bull Racing";
-  for (const k of Object.keys(TEAM)) if (t.includes(k.toLowerCase().split(" ")[0])) return k;
+  const order = [["mclaren", "McLaren"], ["racing bulls", "Racing Bulls"], ["visa cash app", "Racing Bulls"], ["red bull", "Red Bull Racing"], ["williams", "Williams"],
+    ["aston", "Aston Martin"], ["haas", "Haas"], ["alpine", "Alpine"], ["audi", "Audi"], ["sauber", "Audi"], ["cadillac", "Cadillac"], ["mercedes", "Mercedes"], ["ferrari", "Ferrari"]];
+  for (const [k, v] of order) if (t.includes(k)) return v;
   return name;
 }
 const colourOf = (team) => TEAM[teamKey(team)] ?? "#6B7383";
@@ -59,7 +58,7 @@ export function renderUpgrades(tech, pick) {
   const detail = list.length ? list.map((u) => `<tr>
       <td><i class="team" style="background:${colourOf(u.team)}"></i>${esc(teamKey(u.team))}</td>
       <td><b>${esc(u.component)}</b>${u.geometry ? `<div class="muted small">${esc(u.geometry)}</div>` : ""}</td>
-      <td><span class="up-type ${esc(u.type.toLowerCase().replace(/\s+/g, "-"))}">${esc(u.type)}</span><div class="muted small">${esc(u.reason)}</div></td>
+      <td><span class="up-type ${esc(u.type.toLowerCase().replace(/\s+/g, "-"))}">${esc(u.type)}</span>${/ - /.test(u.reason) ? `<div class="muted small">${esc(u.reason.replace(/^[^-]*-\s*/, ""))}</div>` : ""}</td>
       <td class="small">${esc(u.description)}${u.source ? ` <a href="${esc(u.source)}" target="_blank" rel="noopener" class="muted">FIA document</a>` : ""}</td>
     </tr>`).join("") : `<tr><td colspan="4" class="muted small">No upgrades ${sel.team ? `from ${esc(sel.team)} ` : ""}at this event.</td></tr>`;
   return `<section class="card">
