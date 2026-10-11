@@ -10,17 +10,17 @@
    "type": "Race",
    "startUtc": "2026-10-11T12:00:00+00:00",
    "file": "11388.jsonl.gz",
-   "sizeKb": 462,
-   "score": 5,
+   "sizeKb": 458,
+   "score": 4,
    "reasons": [
-    "lots of overtaking",
+    "some good passing",
     "safety cars",
-    "a red flag",
     "changes for the lead"
    ],
    "laps": 62,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11384,
@@ -33,14 +33,14 @@
    "startUtc": "2026-10-10T13:00:00+00:00",
    "file": "11384.jsonl.gz",
    "sizeKb": 46,
-   "score": 4,
+   "score": 3,
    "reasons": [
-    "incredibly tight at the top",
-    "a red flag"
+    "incredibly tight at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11383,
@@ -52,17 +52,17 @@
    "type": "Race",
    "startUtc": "2026-10-10T09:00:00+00:00",
    "file": "11383.jsonl.gz",
-   "sizeKb": 132,
+   "sizeKb": 130,
    "score": 4,
    "reasons": [
     "some good passing",
     "a safety car",
-    "a red flag",
     "a close finish"
    ],
    "laps": 20,
    "telemetry": true,
-   "incidents": 8
+   "incidents": 6,
+   "v": 2
   },
   {
    "key": 11379,
@@ -74,7 +74,7 @@
    "type": "Qualifying",
    "startUtc": "2026-10-09T12:30:00+00:00",
    "file": "11379.jsonl.gz",
-   "sizeKb": 37,
+   "sizeKb": 36,
    "score": 3,
    "reasons": [
     "close at the top",
@@ -82,7 +82,8 @@
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11731,
@@ -94,18 +95,18 @@
    "type": "Race",
    "startUtc": "2026-10-04T07:00:00+00:00",
    "file": "11731.jsonl.gz",
-   "sizeKb": 405,
+   "sizeKb": 400,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 55,
    "telemetry": true,
-   "incidents": 8
+   "incidents": 6,
+   "v": 2
   },
   {
    "key": 11730,
@@ -118,13 +119,12 @@
    "startUtc": "2026-10-03T08:00:00+00:00",
    "file": "11730.jsonl.gz",
    "sizeKb": 32,
-   "score": 2,
-   "reasons": [
-    "a red flag"
-   ],
+   "score": 1,
+   "reasons": [],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11377,
@@ -136,17 +136,17 @@
    "type": "Race",
    "startUtc": "2026-09-26T11:00:00+00:00",
    "file": "11377.jsonl.gz",
-   "sizeKb": 416,
+   "sizeKb": 411,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "a close finish"
    ],
    "laps": 51,
    "telemetry": true,
-   "incidents": 4
+   "incidents": 4,
+   "v": 2
   },
   {
    "key": 11373,
@@ -158,14 +158,35 @@
    "type": "Qualifying",
    "startUtc": "2026-09-25T12:00:00+00:00",
    "file": "11373.jsonl.gz",
-   "sizeKb": 49,
-   "score": 2,
-   "reasons": [
-    "a red flag"
-   ],
+   "sizeKb": 48,
+   "score": 1,
+   "reasons": [],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
+  },
+  {
+   "key": 11369,
+   "year": 2026,
+   "meeting": "Spain",
+   "location": "Madrid",
+   "circuit": "Madring",
+   "name": "Race",
+   "type": "Race",
+   "startUtc": "2026-09-13T13:00:00+00:00",
+   "file": "11369.jsonl.gz",
+   "sizeKb": 437,
+   "score": 4,
+   "reasons": [
+    "some good passing",
+    "a safety car",
+    "changes for the lead"
+   ],
+   "laps": 57,
+   "v": 2,
+   "telemetry": true,
+   "incidents": 2
   },
   {
    "key": 11365,
@@ -178,12 +199,35 @@
    "startUtc": "2026-09-12T14:00:00+00:00",
    "file": "11365.jsonl.gz",
    "sizeKb": 43,
-   "score": 4,
+   "score": 3,
    "reasons": [
-    "incredibly tight at the top",
-    "a red flag"
+    "incredibly tight at the top"
    ],
    "laps": null,
+   "telemetry": true,
+   "incidents": 0,
+   "v": 2
+  },
+  {
+   "key": 11361,
+   "year": 2026,
+   "meeting": "Italy",
+   "location": "Monza",
+   "circuit": "Monza",
+   "name": "Race",
+   "type": "Race",
+   "startUtc": "2026-09-06T13:00:00+00:00",
+   "file": "11361.jsonl.gz",
+   "sizeKb": 374,
+   "score": 5,
+   "reasons": [
+    "lots of overtaking",
+    "safety cars",
+    "a red flag",
+    "changes for the lead"
+   ],
+   "laps": 53,
+   "v": 2,
    "telemetry": true,
    "incidents": 0
   },
@@ -198,14 +242,14 @@
    "startUtc": "2026-09-05T14:00:00+00:00",
    "file": "11357.jsonl.gz",
    "sizeKb": 39,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11353,
@@ -217,17 +261,18 @@
    "type": "Race",
    "startUtc": "2026-08-23T13:00:00+00:00",
    "file": "11353.jsonl.gz",
-   "sizeKb": 492,
-   "score": 5,
+   "sizeKb": 488,
+   "score": 4,
    "reasons": [
-    "lots of overtaking",
+    "some good passing",
     "safety cars",
     "a red flag",
     "changes for the lead"
    ],
    "laps": 72,
    "telemetry": true,
-   "incidents": 2
+   "incidents": 2,
+   "v": 2
   },
   {
    "key": 11349,
@@ -240,14 +285,14 @@
    "startUtc": "2026-08-22T14:00:00+00:00",
    "file": "11349.jsonl.gz",
    "sizeKb": 47,
-   "score": 4,
+   "score": 3,
    "reasons": [
-    "incredibly tight at the top",
-    "a red flag"
+    "incredibly tight at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11348,
@@ -259,16 +304,16 @@
    "type": "Race",
    "startUtc": "2026-08-22T10:00:00+00:00",
    "file": "11348.jsonl.gz",
-   "sizeKb": 181,
-   "score": 3,
+   "sizeKb": 178,
+   "score": 2,
    "reasons": [
     "not much passing",
-    "a red flag",
     "a close finish"
    ],
    "laps": 24,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11344,
@@ -281,14 +326,14 @@
    "startUtc": "2026-08-21T14:30:00+00:00",
    "file": "11344.jsonl.gz",
    "sizeKb": 33,
-   "score": 4,
+   "score": 3,
    "reasons": [
-    "incredibly tight at the top",
-    "a red flag"
+    "incredibly tight at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11342,
@@ -300,17 +345,17 @@
    "type": "Race",
    "startUtc": "2026-07-26T13:00:00+00:00",
    "file": "11342.jsonl.gz",
-   "sizeKb": 482,
+   "sizeKb": 477,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "a safety car",
-    "a red flag",
     "changes for the lead"
    ],
    "laps": 70,
    "telemetry": true,
-   "incidents": 4
+   "incidents": 4,
+   "v": 2
   },
   {
    "key": 11338,
@@ -323,14 +368,14 @@
    "startUtc": "2026-07-25T14:00:00+00:00",
    "file": "11338.jsonl.gz",
    "sizeKb": 39,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11334,
@@ -342,18 +387,18 @@
    "type": "Race",
    "startUtc": "2026-07-19T13:00:00+00:00",
    "file": "11334.jsonl.gz",
-   "sizeKb": 385,
+   "sizeKb": 381,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 45,
    "telemetry": true,
-   "incidents": 8
+   "incidents": 6,
+   "v": 2
   },
   {
    "key": 11330,
@@ -372,7 +417,8 @@
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11326,
@@ -384,18 +430,18 @@
    "type": "Race",
    "startUtc": "2026-07-05T14:00:00+00:00",
    "file": "11326.jsonl.gz",
-   "sizeKb": 457,
+   "sizeKb": 453,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 52,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11322,
@@ -408,14 +454,14 @@
    "startUtc": "2026-07-04T15:00:00+00:00",
    "file": "11322.jsonl.gz",
    "sizeKb": 41,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11321,
@@ -427,17 +473,17 @@
    "type": "Race",
    "startUtc": "2026-07-04T11:00:00+00:00",
    "file": "11321.jsonl.gz",
-   "sizeKb": 157,
+   "sizeKb": 155,
    "score": 5,
    "reasons": [
     "lots of overtaking",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 17,
    "telemetry": true,
-   "incidents": 2
+   "incidents": 2,
+   "v": 2
   },
   {
    "key": 11317,
@@ -450,14 +496,14 @@
    "startUtc": "2026-07-03T15:30:00+00:00",
    "file": "11317.jsonl.gz",
    "sizeKb": 31,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11315,
@@ -469,18 +515,18 @@
    "type": "Race",
    "startUtc": "2026-06-28T13:00:00+00:00",
    "file": "11315.jsonl.gz",
-   "sizeKb": 440,
-   "score": 5,
+   "sizeKb": 435,
+   "score": 4,
    "reasons": [
-    "lots of overtaking",
+    "some good passing",
     "safety cars",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 71,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11311,
@@ -493,14 +539,14 @@
    "startUtc": "2026-06-27T14:00:00+00:00",
    "file": "11311.jsonl.gz",
    "sizeKb": 38,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11307,
@@ -512,17 +558,17 @@
    "type": "Race",
    "startUtc": "2026-06-14T13:00:00+00:00",
    "file": "11307.jsonl.gz",
-   "sizeKb": 417,
+   "sizeKb": 413,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "changes for the lead"
    ],
    "laps": 66,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11303,
@@ -542,7 +588,8 @@
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11299,
@@ -554,7 +601,7 @@
    "type": "Race",
    "startUtc": "2026-06-07T13:00:00+00:00",
    "file": "11299.jsonl.gz",
-   "sizeKb": 488,
+   "sizeKb": 484,
    "score": 4,
    "reasons": [
     "some good passing",
@@ -563,7 +610,8 @@
    ],
    "laps": 78,
    "telemetry": true,
-   "incidents": 5
+   "incidents": 3,
+   "v": 2
   },
   {
    "key": 11295,
@@ -583,7 +631,8 @@
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11291,
@@ -595,17 +644,17 @@
    "type": "Race",
    "startUtc": "2026-05-24T20:00:00+00:00",
    "file": "11291.jsonl.gz",
-   "sizeKb": 384,
+   "sizeKb": 381,
    "score": 5,
    "reasons": [
     "lots of overtaking",
     "safety cars",
-    "a red flag",
     "changes for the lead"
    ],
    "laps": 68,
    "telemetry": true,
-   "incidents": 5
+   "incidents": 4,
+   "v": 2
   },
   {
    "key": 11287,
@@ -618,14 +667,14 @@
    "startUtc": "2026-05-23T20:00:00+00:00",
    "file": "11287.jsonl.gz",
    "sizeKb": 55,
-   "score": 3,
+   "score": 2,
    "reasons": [
-    "close at the top",
-    "a red flag"
+    "close at the top"
    ],
    "laps": null,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   },
   {
    "key": 11286,
@@ -637,18 +686,18 @@
    "type": "Race",
    "startUtc": "2026-05-23T16:00:00+00:00",
    "file": "11286.jsonl.gz",
-   "sizeKb": 165,
+   "sizeKb": 163,
    "score": 5,
    "reasons": [
     "lots of overtaking",
-    "a red flag",
     "changes for the lead",
     "a close finish"
    ],
    "laps": 23,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "v": 2
   }
  ],
- "updated": "2026-10-11T15:28:36.987Z"
+ "updated": "2026-10-11T16:12:44.691Z"
 }
