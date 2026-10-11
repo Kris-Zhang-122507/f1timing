@@ -33,11 +33,13 @@ function el(tag, attrs = {}, parent) {
 export function computeModel(v, sel, pitLoss) {
   const rows = v.rows.filter((r) => r.pos < 99 && !r.out);
   if (!rows.length) return null;
+  // Each car's own gap to the leader, so one car's update doesn't shift everyone behind.
+  // Lapped cars show "1 L" instead of a gap, so for them we add their interval to the car ahead.
   let total = 0;
   const cars = rows.map((r, i) => {
     if (i > 0) {
-      const iv = num(r.int), g = num(r.gap);
-      total = iv != null ? total + iv : g != null ? g : total + 1;
+      const g = num(r.gap), iv = num(r.int);
+      total = g != null && !/L/.test(String(r.gap)) ? g : iv != null ? total + iv : total + 1;
     }
     return { n: r.n, tla: r.tla, name: r.name, colour: r.colour, inPit: r.inPit, int: num(r.int), g: total, lapStart: r.lapStart };
   });
@@ -223,14 +225,37 @@ export class CircleView {
     const now = this.nowFn();
     const leader = m.cars[0];
     const start = leader.lapStart ?? (this.est?.n === leader.n ? this.est.start : null);
-    const lf = start ? Math.min(0.999, Math.max(0, (now - start) / 1000 / m.ref)) : 0;
+    const target = start ? Math.min(0.999, Math.max(0, (now - start) / 1000 / m.ref)) : 0;
 
-    // ease drawn gaps towards the latest timing so cars glide instead of jumping
+    // Leader progress glides: it keeps moving at lap pace and gently speeds up or slows
+    // down to match the timing, instead of snapping when a new lap is detected.
+    const dt = this.lastNow ? Math.max(0, Math.min(1, (now - this.lastNow) / 1000)) : 0;
+    this.lastNow = now;
+    const diff = (a, b) => { let d = wrap(a) - wrap(b); if (d > 0.5) d -= 1; if (d < -0.5) d += 1; return d; };
+    if (this.disp == null || this.dispLeader !== leader.n || Math.abs(diff(target, this.disp)) > 0.15) {
+      this.disp = target;
+      this.dispLeader = leader.n;
+    } else {
+      const err = diff(target, this.disp);
+      this.disp = wrap(this.disp + Math.max(0, dt / m.ref + err * 0.08)); // never backwards
+    }
+    const lf = this.disp;
+
+    // ease each car's gap towards the latest timing, then never let a car slide backwards
+    // by a small amount — it pauses for a moment instead (a pit stop or big change still snaps)
+    this.lastF ??= {};
     const pos = m.cars.map((c) => {
       const s = this.shown[c.n] ?? c.g;
-      const next = Math.abs(c.g - s) > 20 ? c.g : s + (c.g - s) * 0.18;
+      const next = Math.abs(c.g - s) > 20 ? c.g : s + (c.g - s) * 0.12;
       this.shown[c.n] = next;
-      return { c, f: wrap(lf - next / m.ref) };
+      let f = wrap(lf - next / m.ref);
+      const prev = this.lastF[c.n];
+      if (prev != null && !c.inPit) {
+        const d = diff(f, prev);
+        if (d < 0 && d > -0.04) f = prev;
+      }
+      this.lastF[c.n] = f;
+      return { c, f };
     });
 
     // spread labels so they never overlap

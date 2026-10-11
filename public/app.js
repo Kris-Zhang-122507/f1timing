@@ -1,8 +1,8 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3umkr2";
-import { Race } from "./lib/race.js?v=mv3umkr2";
-import { CircleView } from "./circle.js?v=mv3umkr2";
-import { renderTyres } from "./tyres.js?v=mv3umkr2";
+import { LiveState } from "./lib/state.js?v=mv3ur5nk";
+import { Race } from "./lib/race.js?v=mv3ur5nk";
+import { CircleView } from "./circle.js?v=mv3ur5nk";
+import { renderTyres } from "./tyres.js?v=mv3ur5nk";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
