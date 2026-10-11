@@ -340,3 +340,5 @@ h2 .chip { font-size: 11px; padding: 3px 8px; vertical-align: middle; margin-lef
 /* pit cost table: the circuit being raced now */
 tr.me td { background: rgba(255, 181, 71, 0.08); }
 #pitSrc { font-size: 11px; }
+.gridmove { font-size: 10px; margin-left: 6px; }
+h3.sub { font-size: 13px; margin: 16px 0 6px; color: var(--muted, #8B93A7); text-transform: uppercase; letter-spacing: .06em; }

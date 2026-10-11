@@ -22,6 +22,16 @@ export async function loadTrack(circuit) {
   return cache[slug];
 }
 
+// Real car positions for an archived race (data/positions/<key>.json), if the archive has them.
+const gpsCache = {};
+export async function loadGps(key) {
+  if (!key) return null;
+  if (key in gpsCache) return gpsCache[key];
+  gpsCache[key] = null;
+  try { const r = await fetch(`data/positions/${key}.json`); gpsCache[key] = r.ok ? await r.json() : null; } catch { /* timing-based instead */ }
+  return gpsCache[key];
+}
+
 export class TrackView {
   constructor(box, circle, onPick) {
     this.box = box;
@@ -32,8 +42,19 @@ export class TrackView {
     this.box.addEventListener("click", (e) => { const hit = e.target.closest("[data-n]"); if (hit) this.onPick(hit.dataset.n); });
   }
 
-  setPoints(points) {
+  // gps: { t0, step, outline, cars: { n: [x0, y0, x1, y1, …] } } and nowFn gives the replay clock
+  setGps(gps, nowFn) {
+    this.nowFn = nowFn;
+    if (gps === this.gps) return;
+    this.gps = gps;
+    if (gps?.outline) this.setPoints(gps.outline, true);
+    else if (this.usingGps) { this.points = null; this.usingGps = false; }
+  }
+
+  setPoints(points, fromGps = false) {
+    if (this.gps?.outline && !fromGps) return; // real positions win over the generic outline
     if (points === this.points) return;
+    this.usingGps = fromGps;
     this.points = points;
     this.items.clear();
     this.box.innerHTML = "";
@@ -52,6 +73,7 @@ export class TrackView {
     const [sx, sy] = [points[0][0] + pad, points[0][1] + pad];
     el("rect", { x: sx - 10, y: sy - 10, width: 20, height: 20, fill: "#E8EAF0", rx: 3 }, svg);
     el("text", { x: sx, y: sy - 18, class: "c-sub" }, svg).textContent = "start / finish";
+    if (fromGps) el("text", { x: pad, y: h - 20, class: "c-sub", "text-anchor": "start" }, svg).textContent = "real car positions (GPS, once a second)";
     this.battleLayer = el("g", {}, svg);
     this.dotLayer = el("g", {}, svg);
     this.svg = svg;
@@ -80,9 +102,22 @@ export class TrackView {
   }
   stop() { this.running = false; }
 
+  // where car n really was at time t (interpolated between the once-a-second samples)
+  gpsAt(n, t) {
+    const g = this.gps, xy = g?.cars?.[n];
+    if (!xy) return null;
+    const f = (t - g.t0) / g.step, i = Math.floor(f), k = f - i;
+    if (i < 0 || i * 2 + 3 >= xy.length) return null;
+    const [x0, y0, x1, y1] = [xy[i * 2], xy[i * 2 + 1], xy[i * 2 + 2], xy[i * 2 + 3]];
+    if (x0 < 0) return null;
+    if (x1 < 0) return [x0 + this.off, y0 + this.off];
+    return [x0 + (x1 - x0) * k + this.off, y0 + (y1 - y0) * k + this.off];
+  }
+
   frame() {
     const pos = this.circle.lastPos;
     if (!this.points || !pos) return;
+    const t = this.usingGps && this.nowFn ? this.nowFn() : null;
     const sel = this.circle.model?.selCar?.n;
     const seen = new Set();
     // cars close together on track get their names stacked above/below so they stay readable
@@ -99,7 +134,9 @@ export class TrackView {
         it = { g, dot, label };
         this.items.set(p.n, it);
       }
-      const [x, y] = this.at(p.f);
+      const real = t != null ? this.gpsAt(p.n, t) : null;
+      if (t != null && !real) { it.g.setAttribute("opacity", 0); continue; }
+      const [x, y] = real ?? this.at(p.f);
       it.g.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
       it.g.setAttribute("opacity", p.inPit ? 0.4 : 1);
       it.dot.setAttribute("fill", p.colour);

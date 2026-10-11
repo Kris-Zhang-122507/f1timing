@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4bb03z";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4bb03z";
-import { CircleView } from "./circle.js?v=mv4bb03z";
-import { renderTyres } from "./tyres.js?v=mv4bb03z";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4bb03z";
-import { renderCompare } from "./compare.js?v=mv4bb03z";
-import { renderRewind } from "./rewind.js?v=mv4bb03z";
-import { renderDriver } from "./driver.js?v=mv4bb03z";
-import { Player, parseRecording } from "./player.js?v=mv4bb03z";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4bb03z";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv4bb03z";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4bb03z";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4bb03z";
+import { LiveState } from "./lib/state.js?v=mv4buon5";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4buon5";
+import { CircleView } from "./circle.js?v=mv4buon5";
+import { renderTyres } from "./tyres.js?v=mv4buon5";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4buon5";
+import { renderCompare } from "./compare.js?v=mv4buon5";
+import { renderRewind } from "./rewind.js?v=mv4buon5";
+import { renderDriver } from "./driver.js?v=mv4buon5";
+import { Player, parseRecording } from "./player.js?v=mv4buon5";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4buon5";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4buon5";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4buon5";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4buon5";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -93,7 +93,7 @@ setInterval(() => {
 }, 500);
 
 const TOPICS = ["Heartbeat", "SessionInfo", "SessionStatus", "SessionData", "ExtrapolatedClock", "TrackStatus", "LapCount",
-  "DriverList", "TimingData", "TimingAppData", "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio", "PitLaneTimeCollection"];
+  "DriverList", "TimingData", "TimingAppData", "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio", "PitLaneTimeCollection", "PitStopSeries"];
 let directSocket = null;
 
 function connectDirect() {
@@ -476,7 +476,13 @@ function updateCircle(v) {
   if (document.activeElement !== $("pitLoss")) $("pitLoss").value = Math.round(pitLoss.green);
   $("pitSrc").textContent = `(${pitLoss.source})`;
   $("pitReset").hidden = pitLoss.source !== "your number";
-  if (circleMode === "track") loadTrack(v.session.circuit).then((pts) => trackView.setPoints(pts));
+  if (circleMode === "track") {
+    // archived races have every car's real position; otherwise cars are placed by timing
+    const gpsKey = v.mode === "replay" && archive?.sessions?.some((s) => s.key === replayKey && s.gps) ? replayKey : null;
+    if (gpsKey) loadGps(gpsKey).then((g) => trackView.setGps(g, circleNow));
+    else trackView.setGps(null);
+    loadTrack(v.session.circuit).then((pts) => trackView.setPoints(pts));
+  }
   const sel = v.rows.find((r) => r.n === circleSel);
   $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";
   $("circleClear").hidden = !sel;
@@ -504,7 +510,10 @@ function renderRows(v) {
   $("rows").innerHTML = v.rows.map((r) => {
     const close = parseFloat(String(r.int).replace("+", "")) < 1;
     const cls = [r.out || r.knockedOut ? "is-out" : "", r.inPit ? "in-pit" : "", close && !q ? "close" : "", q?.advance && r.pos > q.advance && !r.knockedOut ? "dropzone" : ""].join(" ");
-    let tag = r.out ? `<span class="tag out">OUT</span>` : r.knockedOut ? `<span class="tag out">KNOCKED OUT</span>` : r.inPit ? `<span class="tag pit">IN PIT</span>` : r.pitOut ? `<span class="tag pit">${q ? "OUT LAP" : "PIT EXIT"}</span>` : "";
+    // places gained or lost since the start (F1 sends the grid; replays get it from OpenF1)
+    const moved = !q && r.grid && r.pos < 99 ? r.grid - r.pos : 0;
+    const grid = !q && r.grid ? `<span class="gridmove ${moved > 0 ? "up" : moved < 0 ? "down" : "muted"}" title="Started P${r.grid}">${moved > 0 ? "▲" + moved : moved < 0 ? "▼" + -moved : "="}</span>` : "";
+    let tag = r.dsq ? `<span class="tag out">DSQ</span>` : r.out ? `<span class="tag out">OUT</span>` : r.knockedOut ? `<span class="tag out">KNOCKED OUT</span>` : r.inPit ? `<span class="tag pit">IN PIT</span>` : r.pitOut ? `<span class="tag pit">${q ? "OUT LAP" : "PIT EXIT"}</span>` : "";
     if (q && cutTime && r.pos > q.advance && !r.knockedOut) {
       const mine = lapSeconds(r.best);
       if (!mine) tag += `<span class="tag need">no time yet</span>`;
@@ -520,7 +529,7 @@ function renderRows(v) {
     return `${line}<tr class="${cls}">
       <td class="num pos">${r.pos === 99 ? "–" : r.pos}</td>
       <td class="bar"><i style="background:${esc(r.colour)}"></i></td>
-      <td><span class="drv" title="${esc(r.name)} · ${esc(r.team)}">${esc(r.tla)}</span>${tag}</td>
+      <td><span class="drv" title="${esc(r.name)} · ${esc(r.team)}">${esc(r.tla)}</span>${grid}${tag}</td>
       <td class="num">${esc(r.gap)}</td>
       <td class="num int">${esc(r.int)}</td>
       <td class="num ${r.lastC ? "c-" + r.lastC : ""}">${esc(r.last)}</td>

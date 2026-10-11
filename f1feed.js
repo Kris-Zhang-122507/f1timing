@@ -9,7 +9,7 @@ export const TOPICS = [
   "Heartbeat", "SessionInfo", "SessionStatus", "SessionData", "ExtrapolatedClock",
   "TrackStatus", "LapCount", "DriverList", "TimingData", "TimingAppData",
   "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio",
-  "PitLaneTimeCollection", "ChampionshipPrediction", "CarData.z", "Position.z",
+  "PitLaneTimeCollection", "PitStopSeries", "ChampionshipPrediction", "CarData.z", "Position.z",
 ];
 
 export async function connectLive({ onSnapshot, onMessage, log = console.log }) {

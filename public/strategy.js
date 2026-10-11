@@ -1,6 +1,6 @@
 // Strategy tab: predicted finish, pit predictor, battle forecast and the pit stop log.
 // Everything here is a simple, explainable estimate — not a crystal ball.
-import { computeModel, lossFor } from "./circle.js?v=mv4bb03z";
+import { computeModel, lossFor } from "./circle.js?v=mv4buon5";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const TYRE = { S: "#FF5A5A", M: "#FFD23F", H: "#E8EAF0", I: "#3DDC97", W: "#4A90E2" };
@@ -93,8 +93,8 @@ export function renderStrategy(v, pitLoss) {
     let lap = 0;
     r.stints.forEach((s, k) => {
       if (k > 0) {
-        const dur = r.pitTimes.find((p) => Math.abs(p.lap - lap) <= 1)?.dur;
-        stops.push({ r, lap, from: r.stints[k - 1].c, to: s.c, isNew: s.isNew, dur });
+        const pt = r.pitTimes.find((p) => Math.abs(p.lap - lap) <= 1);
+        stops.push({ r, lap, from: r.stints[k - 1].c, to: s.c, isNew: s.isNew, dur: pt?.dur, stop: pt?.stop });
       }
       lap += s.laps;
     });
@@ -102,8 +102,14 @@ export function renderStrategy(v, pitLoss) {
   stops.sort((a, b) => b.lap - a.lap);
   const logHtml = stops.length ? stops.map((s) => `<tr><td class="num">L${s.lap || "?"}</td><td>${bar(s.r)}<span class="drv">${esc(s.r.tla)}</span></td>
       <td>${tyre(s.from)} → ${tyre(s.to)} <span class="muted small">${s.isNew ? "new" : "used"}</span></td>
+      <td class="num">${s.stop ? s.stop.toFixed(1) + "s" : "<span class='muted'>—</span>"}</td>
       <td class="num">${s.dur ? s.dur.toFixed(1) + "s" : "<span class='muted'>—</span>"}</td></tr>`).join("")
-    : `<tr><td colspan="4" class="muted small">No pit stops yet.</td></tr>`;
+    : `<tr><td colspan="5" class="muted small">No pit stops yet.</td></tr>`;
+  // quickest crews: stationary time, best stop per team
+  const byTeam = new Map();
+  for (const s of stops) if (s.stop && (!byTeam.has(s.r.team) || s.stop < byTeam.get(s.r.team).stop)) byTeam.set(s.r.team, s);
+  const fastest = [...byTeam.values()].sort((a, b) => a.stop - b.stop);
+  const crewHtml = fastest.length ? `<h3 class="sub">Fastest crews</h3><table class="timing compact"><tbody>${fastest.map((s, i) => `<tr><td class="num pos">${i + 1}</td><td>${bar(s.r)}<span class="drv">${esc(s.r.team)}</span> <span class="muted small">${esc(s.r.tla)} · L${s.lap}</span></td><td class="num"><b>${s.stop.toFixed(1)}s</b></td></tr>`).join("")}</tbody></table>` : "";
 
   return `<div class="strategy">
     <section class="card">
@@ -122,7 +128,8 @@ export function renderStrategy(v, pitLoss) {
     </section>
     <section class="card">
       <h2>Pit stops</h2>
-      <div class="scroll"><table class="timing compact"><thead><tr><th>LAP</th><th>DRV</th><th>TYRES</th><th class="r">PIT LANE</th></tr></thead><tbody>${logHtml}</tbody></table></div>
+      <div class="scroll"><table class="timing compact"><thead><tr><th>LAP</th><th>DRV</th><th>TYRES</th><th class="r" title="Time the car was stationary">STOP</th><th class="r" title="Whole time in the pit lane">PIT LANE</th></tr></thead><tbody>${logHtml}</tbody></table></div>
+      ${crewHtml}
     </section>
   </div>`;
 }

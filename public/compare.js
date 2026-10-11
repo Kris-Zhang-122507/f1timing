@@ -1,5 +1,5 @@
 // Compare: two drivers head to head.
-import { lapSeconds } from "./lib/race.js?v=mv4bb03z";
+import { lapSeconds } from "./lib/race.js?v=mv4buon5";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace("+", "")); return Number.isFinite(n) ? n : null; };
@@ -51,6 +51,8 @@ function telemetryHtml(tele, A, B) {
     ${lane("speed", 150, vmax, `Speed (top ${vmax} km/h)`)}
     ${lane("throttle", 60, 100, "Throttle")}
     ${lane("brake", 34, 1, "Brake", true)}
+    ${a.gear && b.gear ? lane("gear", 60, 8, "Gear", true) : ""}
+    ${a.rpm && b.rpm ? lane("rpm", 70, Math.max(...a.rpm, ...b.rpm), `Engine RPM (top ${Math.max(...a.rpm, ...b.rpm).toLocaleString()})`) : ""}
     <div class="muted small">Distance along the lap → (${(maxD / 1000).toFixed(2)} km)</div>
   </section>`;
 }

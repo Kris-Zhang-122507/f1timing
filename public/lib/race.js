@@ -120,6 +120,9 @@ export class Race {
     this.posHist = {};           // driver -> [{ lap, pos }] position at the end of each lap
     this.pendingOvertakes = [];  // waiting to be sure they weren't just a pit stop
     this.pitAt = {};             // driver -> last time seen in or leaving the pits
+    this.officialOvertakes = false; // replays from OpenF1 carry a list of real overtakes
+    this.seenOvertakes = new Set();
+    this.seenStops = new Set();
   }
 
   get lap() {
@@ -153,6 +156,28 @@ export class Race {
       const log = (this.pitTimes[n] ??= []);
       const lapNo = Number(pt.Lap) || lap;
       if (!log.some((x) => x.lap === lapNo)) log.push({ lap: lapNo, dur });
+    }
+
+    // stationary pit stop times (F1's PitStopSeries topic; replays get it from OpenF1)
+    for (const [n, byIdx] of Object.entries(d.PitStopSeries?.PitTimes ?? {})) {
+      for (const [k, e] of Object.entries(byIdx ?? {})) {
+        const ps = e?.PitStop, stop = parseFloat(ps?.PitStopTime);
+        const id = `${n}:${k}`;
+        if (!ps || !Number.isFinite(stop) || this.seenStops.has(id)) continue;
+        this.seenStops.add(id);
+        const lapNo = Number(ps.Lap) || lap;
+        const log = (this.pitTimes[n] ??= []);
+        const row = log.find((x) => x.lap === lapNo);
+        if (row) row.stop = stop; else log.push({ lap: lapNo, dur: parseFloat(ps.PitLaneTime) || null, stop });
+      }
+    }
+
+    // official overtakes (replays): still held back briefly so pit stop swaps are filtered out
+    for (const [k, o] of Object.entries(d.Overtakes?.Overtakes ?? {})) {
+      if (this.seenOvertakes.has(k) || !o) continue;
+      this.seenOvertakes.add(k);
+      this.officialOvertakes = true;
+      if (lap > 1) this.pendingOvertakes.push({ a: o.Overtaking, b: o.Overtaken, pos: o.Position, t: this.now(), lap });
     }
 
     // remember which lap each team radio clip arrived on (the feed only gives a time)
@@ -213,7 +238,8 @@ export class Race {
         if (c.pitOut && !p.pitOut) {
           const stint = this.currentStint(n);
           const tyre = stint ? `${stint.New === "true" || stint.New === true ? "new" : "used"} ${String(stint.Compound ?? "").toLowerCase()}s` : "new tyres";
-          this.add("pit", `${name} rejoins P${c.pos} on ${tyre}`, "");
+          const st = (this.pitTimes[n] ?? []).find((x) => x.stop && Math.abs(x.lap - lap) <= 1)?.stop;
+          this.add("pit", `${name} rejoins P${c.pos} on ${tyre}${st ? ` · ${st.toFixed(1)}s stop` : ""}`, "");
         }
         if (c.out && !p.out) this.add("out", `${name} is out of the race`, "");
         if (c.lastFastest && (c.last !== p.last || !p.lastFastest) && c.last && c.last !== this.fastest) {
@@ -251,7 +277,7 @@ export class Race {
           for (const a of Object.keys(now)) {
             for (const b of Object.keys(now)) {
               if (a === b || !before[a] || !before[b] || busy(a) || busy(b)) continue;
-              if (before[a].pos > before[b].pos && now[a].pos < now[b].pos && now[a].pos === now[b].pos - 1) {
+              if (!this.officialOvertakes && before[a].pos > before[b].pos && now[a].pos < now[b].pos && now[a].pos === now[b].pos - 1) {
                 this.pendingOvertakes.push({ a, b, pos: now[a].pos, t: this.now(), lap });
               }
             }
@@ -341,8 +367,10 @@ export class Race {
         stops: Number(l.NumberOfPitStops) || 0,
         inPit: !!l.InPit,
         pitOut: !!l.PitOut,
-        out: !!(l.Retired || l.Stopped),
+        out: !!(l.Retired || l.Stopped || d.SessionResult?.Results?.[n]?.Dnf),
         knockedOut: !!l.KnockedOut,
+        grid: Number(d.TimingAppData?.Lines?.[n]?.GridPos) || null,
+        dsq: !!d.SessionResult?.Results?.[n]?.Dsq,
         tyre: (stint.Compound ?? "").charAt(0) || "?",
         tyreAge: stint.TotalLaps ?? "",
         tyreNew: stint.New === "true" || stint.New === true,

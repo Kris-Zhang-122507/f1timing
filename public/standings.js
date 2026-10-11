@@ -58,15 +58,33 @@ export async function loadStandings() {
       if (rule) incidents.push({ where: `R${race.round}`, round: race.round, race: race.name, code: res.Driver?.code, driver: `${res.Driver?.givenName ?? ""} ${res.Driver?.familyName ?? ""}`.trim(), team: res.Constructor?.name, teamId: res.Constructor?.constructorId, status: res.status, pts: rule[1], kind: rule[2] });
     }
   } catch { incidents = null; }
+  let drivers = (dl?.DriverStandings ?? []).map((d) => ({
+    pos: Number(d.position || d.positionText) || null, points: Number(d.points), wins: Number(d.wins),
+    code: d.Driver?.code, name: `${d.Driver?.givenName ?? ""} ${d.Driver?.familyName ?? ""}`.trim(),
+    team: d.Constructors?.[d.Constructors.length - 1]?.name ?? "", teamId: d.Constructors?.[d.Constructors.length - 1]?.constructorId ?? "",
+  }));
+  let teams = (cl?.ConstructorStandings ?? []).map((c) => ({ pos: Number(c.position || c.positionText) || null, points: Number(c.points), wins: Number(c.wins), name: c.Constructor?.name, id: c.Constructor?.constructorId }));
+  let after = `round ${Number(dl?.round) || 0}`, source = "Jolpica";
+  // OpenF1 has the championship minutes after a race; Jolpica takes a few hours. Use whichever
+  // is newer (more points handed out = more races counted).
+  try {
+    const r = await fetch(`data/championship.json?t=${Math.floor(Date.now() / 3e5)}`);
+    const ch = r.ok ? await r.json() : null;
+    const sum = (xs) => xs.reduce((a, x) => a + (Number(x.points) || 0), 0);
+    if (ch?.drivers?.length && sum(ch.drivers) > sum(drivers)) {
+      const slugT = (t) => String(t ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      const winsOf = Object.fromEntries(drivers.map((d) => [d.code, d.wins]));
+      const teamWins = Object.fromEntries(teams.map((t) => [slugT(t.name), t.wins]));
+      const winnerTeam = ch.drivers.find((d) => d.code === ch.winner)?.team;
+      drivers = ch.drivers.map((d) => ({ pos: d.pos, points: d.points, wins: (winsOf[d.code] ?? 0) + (d.code === ch.winner ? 1 : 0), code: d.code, name: d.name, team: d.team, teamId: slugT(d.team), colour: d.colour ? `#${d.colour}` : null }));
+      teams = ch.teams.map((t) => ({ pos: t.pos, points: t.points, wins: (teamWins[slugT(t.name)] ?? 0) + (t.name === winnerTeam ? 1 : 0), name: t.name, id: slugT(t.name) }));
+      after = `the ${ch.meeting} GP`; source = "OpenF1";
+    }
+  } catch { /* Jolpica only */ }
   cache = {
-    at: Date.now(),
-    round: Number(dl?.round) || 0,
-    drivers: (dl?.DriverStandings ?? []).map((d) => ({
-      pos: Number(d.position || d.positionText) || null, points: Number(d.points), wins: Number(d.wins),
-      code: d.Driver?.code, name: `${d.Driver?.givenName ?? ""} ${d.Driver?.familyName ?? ""}`.trim(),
-      team: d.Constructors?.[d.Constructors.length - 1]?.name ?? "", teamId: d.Constructors?.[d.Constructors.length - 1]?.constructorId ?? "",
-    })),
-    teams: (cl?.ConstructorStandings ?? []).map((c) => ({ pos: Number(c.position || c.positionText) || null, points: Number(c.points), wins: Number(c.wins), name: c.Constructor?.name, id: c.Constructor?.constructorId })),
+    at: Date.now(), after, source,
+    round: (Number(dl?.round) || 0) + (source === "OpenF1" ? 1 : 0),
+    drivers, teams,
     incidents,
   };
   return cache;
@@ -84,7 +102,7 @@ function projection(v) {
 
 export function renderStandings(st, v, { live = false, currentRound = null } = {}) {
   if (!st) return `<section class="card"><div class="muted small">Loading standings…</div></section>`;
-  const colourOf = (code) => v?.rows?.find((r) => r.tla === code)?.colour ?? "#6B7383";
+  const colourOf = (code) => v?.rows?.find((r) => r.tla === code)?.colour ?? st.drivers.find((d) => d.code === code)?.colour ?? "#6B7383";
   const teamColour = (teamId) => {
     const d = st.drivers.find((x) => x.teamId === teamId);
     return d ? colourOf(d.code) : "#6B7383";
@@ -144,12 +162,12 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
   return `${proj ? `<div class="card proj-note"><span class="badge red">LIVE</span> “If it ended now” adds the points each driver would get for their current position in this ${proj.label}.</div>` : ""}
     <div class="standings">
       <section class="card">
-        <div class="card-head"><h2>Drivers' Championship</h2><span class="muted small">after round ${st.round}</span></div>
+        <div class="card-head"><h2>Drivers' Championship</h2><span class="muted small">after ${esc(st.after)}</span></div>
         <div class="scroll"><table class="timing compact"><thead><tr><th class="r">P</th><th>DRIVER</th><th>TEAM</th><th class="r">WINS</th><th class="r">PTS</th><th class="r">GAP</th>${projHead}</tr></thead><tbody>${dRows}</tbody></table></div>
       </section>
       <div class="stack">
         <section class="card">
-          <div class="card-head"><h2>Constructors' Championship</h2><span class="muted small">after round ${st.round}</span></div>
+          <div class="card-head"><h2>Constructors' Championship</h2><span class="muted small">after ${esc(st.after)}</span></div>
           <table class="timing compact"><thead><tr><th class="r">P</th><th>TEAM</th><th class="r">WINS</th><th class="r">PTS</th>${projHead}</tr></thead><tbody>${tRows}</tbody></table>
         </section>
         <section class="card">
@@ -159,5 +177,5 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
         </section>
       </div>
     </div>
-    <p class="muted small">Standings from Jolpica (the community-run successor to Ergast). They update a few hours after each race.</p>`;
+    <p class="muted small">Standings from ${st.source === "OpenF1" ? "OpenF1 (available minutes after a race; wins from Jolpica)" : "Jolpica (the community-run successor to Ergast) — they update a few hours after each race"}.</p>`;
 }

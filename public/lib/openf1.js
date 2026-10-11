@@ -59,6 +59,11 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
   const rcm = await get("race_control");
   const radio = await get("team_radio");
   const weather = await get("weather");
+  // newer endpoints: official overtakes, the starting grid and the final result (races only)
+  const extra = async (ep) => (isRace ? get(ep).catch(() => []) : []);
+  const overtakes = await extra("overtakes");
+  const grid = await extra("starting_grid");
+  const result = await extra("session_result");
 
   const start = Date.parse(session.date_start), end = Date.parse(session.date_end);
   const ev = []; // { ms, topic, data }
@@ -151,15 +156,31 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
     }
   }
 
+  // --- starting grid (F1's live feed sends this as GridPos) ---
+  for (const g of grid) if (g.position) at(start - 50000, "TimingAppData", { Lines: { [g.driver_number]: { GridPos: String(g.position) } } });
+
+  // --- overtakes as recorded by OpenF1 (better than guessing from position changes) ---
+  overtakes.forEach((o, i) => at(Date.parse(o.date), "Overtakes", { Overtakes: { [i]: { Utc: o.date, Overtaking: String(o.overtaking_driver_number), Overtaken: String(o.overtaken_driver_number), Position: o.position } } }));
+
+  // --- final classification: who was disqualified / didn't finish ---
+  const res = {};
+  for (const r of result) res[r.driver_number] = { Position: r.position ?? null, Dnf: !!r.dnf, Dns: !!r.dns, Dsq: !!r.dsq, Laps: r.number_of_laps ?? null };
+  if (result.length) at(end, "SessionResult", { Results: res });
+
   // --- pit stops ---
-  const stopCount = {};
+  const stopCount = {}, stopIdx = {};
   for (const p of [...pits].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))) {
     const n = p.driver_number, t = Date.parse(p.date);
     stopCount[n] = (stopCount[n] ?? 0) + 1;
-    const dur = p.pit_duration ?? p.lane_duration ?? 22;
+    const dur = p.lane_duration ?? p.pit_duration ?? 22;
     at(t, "TimingData", { Lines: { [n]: { InPit: true, PitOut: false, NumberOfPitStops: stopCount[n] } } });
     at(t + dur * 1000, "TimingData", { Lines: { [n]: { InPit: false, PitOut: true } } });
     at(t + dur * 1000 + 15000, "TimingData", { Lines: { [n]: { PitOut: false } } });
+    // stationary time (OpenF1 has it from late 2024), in the shape of F1's PitStopSeries topic
+    if (p.stop_duration) {
+      const k = (stopIdx[n] = (stopIdx[n] ?? -1) + 1);
+      at(t + dur * 1000 - 1, "PitStopSeries", { PitTimes: { [n]: { [k]: { Timestamp: iso(t), PitStop: { RacingNumber: String(n), PitStopTime: String(p.stop_duration), PitLaneTime: String(dur), Lap: String(p.lap_number ?? "") } } } } });
+    }
     at(t + dur * 1000, "PitLaneTimeCollection", { PitTimes: { [n]: { RacingNumber: String(n), Duration: String(dur), Lap: String(p.lap_number ?? "") } } });
   }
 
@@ -216,7 +237,7 @@ export async function trackOutline(sessionKey, lap, { fetchFn = fetch } = {}) {
   return thin.map(([x, y]) => [Math.round((x - minX) * scale), Math.round((Math.max(...ys) - y) * scale)]);
 }
 
-// Speed / throttle / brake / gear along a driver's fastest lap, ~250 samples, with distance.
+// Speed / throttle / brake / gear / RPM along a driver's fastest lap, ~250 samples, with distance.
 export async function lapTelemetry(sessionKey, lap, { fetchFn = fetch } = {}) {
   const rows = await openf1(`car_data?session_key=${sessionKey}&driver_number=${lap.driver}${range(lap.start, lap.start + lap.seconds * 1000)}`, fetchFn);
   if (rows.length < 20) return null;
@@ -225,9 +246,54 @@ export async function lapTelemetry(sessionKey, lap, { fetchFn = fetch } = {}) {
     const t = Date.parse(r.date);
     if (prev) dist += ((prev.speed + r.speed) / 2 / 3.6) * ((t - prev.t) / 1000);
     prev = { t, speed: r.speed };
-    return { d: Math.round(dist), speed: r.speed, throttle: r.throttle, brake: r.brake ? 1 : 0, gear: r.n_gear };
+    return { d: Math.round(dist), speed: r.speed, throttle: r.throttle, brake: r.brake ? 1 : 0, gear: r.n_gear, rpm: r.rpm };
   });
   const step = Math.max(1, Math.floor(all.length / 250));
   const s = all.filter((_, i) => i % step === 0);
-  return { lap: lap.lap, time: lap.seconds, d: s.map((x) => x.d), speed: s.map((x) => x.speed), throttle: s.map((x) => x.throttle), brake: s.map((x) => x.brake), gear: s.map((x) => x.gear) };
+  return { lap: lap.lap, time: lap.seconds, d: s.map((x) => x.d), speed: s.map((x) => x.speed), throttle: s.map((x) => x.throttle), brake: s.map((x) => x.brake), gear: s.map((x) => x.gear), rpm: s.map((x) => x.rpm ?? 0) };
+}
+
+// Where every car really was (OpenF1's location feed), once a second for the whole session,
+// plus a circuit outline in the same coordinates. For replaying the track map with real
+// positions instead of timing estimates. ~20 requests, so the archive job does a few per run.
+export async function gpsReplay(sessionKey, { drivers, start, end, bestLap, fetchFn = fetch, wait = 2200, log = () => {} }) {
+  const STEP = 1000;
+  const t0 = Math.floor(start / STEP) * STEP, n = Math.ceil((end - t0) / STEP);
+  const raw = {};
+  for (const d of drivers) {
+    try {
+      const rows = await openf1(`location?session_key=${sessionKey}&driver_number=${d}${range(start, end)}`, fetchFn);
+      const pts = rows.filter((p) => p.x || p.y).map((p) => [Date.parse(p.date), p.x, p.y]);
+      if (pts.length > 100) raw[d] = pts;
+    } catch (e) { log(`  no positions for ${d}: ${e.message}`); }
+    await new Promise((r) => setTimeout(r, wait));
+  }
+  const all = Object.values(raw).flat();
+  if (!all.length) return null;
+  // shared transform into a 0–1000 box (y flipped so north is up, like the track map)
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [, x, y] of all) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  const scale = 1000 / Math.max(maxX - minX, maxY - minY);
+  const norm = (x, y) => [Math.round((x - minX) * scale), Math.round((maxY - y) * scale)];
+  const cars = {};
+  for (const [d, pts] of Object.entries(raw)) {
+    const out = new Array(n * 2).fill(-1);
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * STEP;
+      while (j < pts.length - 1 && pts[j + 1][0] <= t) j++;
+      const p = pts[j];
+      if (Math.abs(p[0] - t) > 5000) continue; // no data near this second
+      [out[i * 2], out[i * 2 + 1]] = norm(p[1], p[2]);
+    }
+    cars[d] = out;
+  }
+  // outline: the fastest lap's own points (thinned), in the same coordinates
+  let outline = null;
+  const lapPts = bestLap && raw[bestLap.driver]?.filter((p) => p[0] >= bestLap.start && p[0] <= bestLap.start + bestLap.seconds * 1000);
+  if (lapPts?.length > 50) {
+    const step = Math.max(1, Math.floor(lapPts.length / 400));
+    outline = lapPts.filter((_, i) => i % step === 0).map((p) => norm(p[1], p[2]));
+  }
+  return { key: sessionKey, t0, step: STEP, outline, cars };
 }

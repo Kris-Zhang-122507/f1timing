@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { LiveState } from "../public/lib/state.js";
 import { Race } from "../public/lib/race.js";
-import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry } from "../public/lib/openf1.js";
+import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry, gpsReplay } from "../public/lib/openf1.js";
 import { extractIncidents, analyseCrash } from "./incidents.mjs";
 
 const YEAR = Number(process.argv[2]) || new Date().getUTCFullYear();
@@ -23,6 +23,20 @@ const OUT = "public/data/sessions";
 const TRACKS = "public/data/tracks";
 const TELEMETRY = "public/data/telemetry";
 const INCIDENTS = "public/data/incidents";
+const POSITIONS = "public/data/positions";
+const GPS_PER_RUN = Number(process.env.GPS_PER_RUN ?? 2); // ~20 big requests each
+
+// Every driver's fastest lap: speed, throttle, brake, gear, RPM (for the Compare tab)
+async function saveTelemetry(s, best) {
+  const tele = { key: s.session_key, circuit: s.circuit_short_name, drivers: {} };
+  for (const lap of best) {
+    try { const t = await lapTelemetry(s.session_key, lap); if (t) tele.drivers[lap.driver] = t; } catch (e) { log(`  no telemetry for ${lap.driver}: ${e.message}`); }
+    await pause(WAIT);
+  }
+  if (!Object.keys(tele.drivers).length) return false;
+  writeFileSync(`${TELEMETRY}/${s.session_key}.json`, JSON.stringify(tele));
+  return true;
+}
 
 // Crashes, collisions and stopped cars for one session, with a crash analysis for the
 // serious ones. Saved per session; the season summary feeds the Destructors' Championship.
@@ -42,7 +56,8 @@ const WAIT = process.env.OPENF1_WAIT ? Number(process.env.OPENF1_WAIT) : 2200;
 const KEEP = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
 // Bump when the replay builder changes in a way worth rebuilding old files for.
 // 2: lap counter never goes backwards; chequered flag no longer read as a red flag.
-const FORMAT = 2;
+// 3: official overtakes, starting grid, final result, stationary pit stop times, RPM telemetry.
+const FORMAT = 3;
 
 // On GitHub Actions, "::notice::" / "::error::" lines show up as annotations on the run.
 const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
@@ -115,6 +130,7 @@ async function main() {
   mkdirSync(TRACKS, { recursive: true });
   mkdirSync(TELEMETRY, { recursive: true });
   mkdirSync(INCIDENTS, { recursive: true });
+  mkdirSync(POSITIONS, { recursive: true });
   const idxPath = `${OUT}/index.json`;
   const index = existsSync(idxPath) ? JSON.parse(readFileSync(idxPath, "utf8")) : { sessions: [] };
   const have = new Set(index.sessions.map((s) => s.key));
@@ -137,7 +153,10 @@ async function main() {
   log(`${todo.length} session(s) to archive (${stale.size} rebuilt in the newer format)`);
 
   let added = 0;
+  // stop starting new work after ~90 minutes so the job always gets to save (the next run continues)
+  const deadline = Date.now() + Number(process.env.ARCHIVE_BUDGET_MIN ?? 90) * 60000;
   for (const s of todo) {
+    if (Date.now() > deadline) { notice("Time budget used — the rest continues next run."); break; }
     log(`Archiving ${s.country_name} — ${s.session_name} (${s.session_key}) …`);
     try {
       const { lines, laps } = await buildReplay(s.session_key, { log });
@@ -157,6 +176,10 @@ async function main() {
         // rebuilding an older file: keep its telemetry, redo its incidents
         Object.assign(old, fresh);
         await saveIncidents(old, lines);
+        // telemetry from before RPM was saved: fetch it again
+        const tf = `${TELEMETRY}/${s.session_key}.json`;
+        const hasRpm = existsSync(tf) && /"rpm"/.test(readFileSync(tf, "utf8"));
+        if (!hasRpm) old.telemetry = await saveTelemetry(s, fastestLaps(laps).sort((a, b) => a.seconds - b.seconds)) || old.telemetry;
         notice(`Rebuilt ${s.country_name} ${s.session_name}`);
         await pause(WAIT);
         continue;
@@ -174,14 +197,8 @@ async function main() {
         } catch (e) { log(`  no track outline: ${e.message}`); }
         await pause(WAIT);
       }
-      const tele = { key: s.session_key, circuit: s.circuit_short_name, drivers: {} };
-      for (const lap of best) {
-        try { const t = await lapTelemetry(s.session_key, lap); if (t) tele.drivers[lap.driver] = t; } catch (e) { log(`  no telemetry for ${lap.driver}: ${e.message}`); }
-        await pause(WAIT);
-      }
-      if (Object.keys(tele.drivers).length) writeFileSync(`${TELEMETRY}/${s.session_key}.json`, JSON.stringify(tele));
       const entry = index.sessions[index.sessions.length - 1];
-      entry.telemetry = Object.keys(tele.drivers).length > 0;
+      entry.telemetry = await saveTelemetry(s, best);
       await saveIncidents(entry, lines);
 
       notice(`Saved ${s.country_name} ${s.session_name}: ${lines.length} messages, ${Math.round(gz.length / 1024)} KB, worth watching ${rating.score}/5`);
@@ -212,6 +229,55 @@ async function main() {
       log(`  no track map for ${entry.circuit}: ${e.message}`);
     }
   }
+
+  // real car positions for the track map in race replays (newest first, a couple per run)
+  let gpsDone = 0;
+  for (const entry of index.sessions) {
+    if (gpsDone >= GPS_PER_RUN || Date.now() > deadline + 20 * 60000) break;
+    if (entry.gps || !/^(Race|Sprint)$/.test(entry.name)) continue;
+    const s = sessions.find((x) => x.session_key === entry.key);
+    if (!s) continue;
+    gpsDone++;
+    try {
+      const laps = await openf1(`laps?session_key=${entry.key}`);
+      await pause(WAIT);
+      const drivers = [...new Set(laps.map((l) => l.driver_number))];
+      const best = fastestLaps(laps).sort((a, b) => a.seconds - b.seconds)[0];
+      const gps = await gpsReplay(entry.key, { drivers, start: Date.parse(s.date_start), end: Date.parse(s.date_end), bestLap: best, wait: WAIT, log });
+      if (gps?.outline) {
+        writeFileSync(`${POSITIONS}/${entry.key}.json`, JSON.stringify(gps));
+        entry.gps = true;
+        log(`Car positions for ${entry.meeting} ${entry.name}`);
+      }
+    } catch (e) {
+      if (/401/.test(e.message)) break;
+      log(`  no car positions for ${entry.key}: ${e.message}`);
+    }
+  }
+
+  // championship straight after a race (OpenF1 has it within minutes; Jolpica takes hours)
+  try {
+    const lastRace = done.filter((x) => x.session_name === "Race").sort((a, b) => Date.parse(b.date_start) - Date.parse(a.date_start))[0];
+    const champFile = "public/data/championship.json";
+    const have = existsSync(champFile) ? JSON.parse(readFileSync(champFile, "utf8")) : null;
+    if (lastRace && have?.key !== lastRace.session_key) {
+      const q = `session_key=${lastRace.session_key}`;
+      const cd = await openf1(`championship_drivers?${q}`); await pause(WAIT);
+      const ct = await openf1(`championship_teams?${q}`); await pause(WAIT);
+      const dr = await openf1(`drivers?${q}`); await pause(WAIT);
+      const res = await openf1(`session_result?${q}`); await pause(WAIT);
+      const who = Object.fromEntries(dr.map((d) => [d.driver_number, d]));
+      if (cd.length) {
+        writeIfChanged(champFile, {
+          key: lastRace.session_key, meeting: lastRace.country_name, date: lastRace.date_start,
+          winner: who[res.find((r) => r.position === 1)?.driver_number]?.name_acronym ?? null,
+          drivers: cd.map((c) => ({ n: c.driver_number, code: who[c.driver_number]?.name_acronym ?? String(c.driver_number), name: who[c.driver_number]?.full_name ?? "", team: who[c.driver_number]?.team_name ?? "", colour: who[c.driver_number]?.team_colour ?? null, points: c.points_current, pos: c.position_current, pointsStart: c.points_start, posStart: c.position_start })).sort((a, b) => a.pos - b.pos),
+          teams: ct.map((t) => ({ name: t.team_name, points: t.points_current, pos: t.position_current, pointsStart: t.points_start, posStart: t.position_start })).sort((a, b) => a.pos - b.pos),
+        });
+        log(`Championship after ${lastRace.country_name}`);
+      }
+    }
+  } catch (e) { log(`  no championship data: ${e.message}`); }
 
   // older archived sessions that don't have incident data yet: work it out from the saved replay
   for (const entry of index.sessions) {
