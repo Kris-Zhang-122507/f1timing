@@ -35,7 +35,10 @@ jobs:
       - name: FIA documents (upgrades, power unit usage)
         run: |
           which pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
-          node scripts/fia.mjs
+          timeout 1200 node scripts/fia.mjs
+        continue-on-error: true
+      - name: Crash cost estimates
+        run: node scripts/crashcost.mjs
         continue-on-error: true
       - name: Pit stop cost per circuit
         run: node scripts/pitloss.mjs --history 0 12

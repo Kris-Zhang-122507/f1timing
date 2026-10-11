@@ -23,7 +23,7 @@ const log = (...a) => console.log(...a);
 async function get(url, binary = false) {
   for (let i = 0; i < 3; i++) {
     try {
-      const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en" } });
+      const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en" }, signal: AbortSignal.timeout(45000) });
       if (r.ok) return binary ? Buffer.from(await r.arrayBuffer()) : r.text();
       log(`  ${r.status} ${url}`);
       if (r.status === 404) return null;
@@ -73,6 +73,7 @@ async function main() {
     const cached = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
     // documents can still change during and just after the newest two weekends
     if (cached && i >= 2 && cached.pu?.length && cached.upgradesChecked) { events.push({ ...cached, round }); continue; }
+    log(`R${round} ${name}: checking documents…`);
     const page = await get(`${seasonUrl}/event/${encodeURIComponent(name)}`);
     await pause(1500);
     if (!page) { if (cached) events.push({ ...cached, round }); continue; }

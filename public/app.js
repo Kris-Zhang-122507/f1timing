@@ -14,6 +14,7 @@ import { Dashboard } from "./dash.js?v=mv4f3bdm";
 import { CarTelemetry } from "./telemetry.js?v=mv4f3bdm";
 import { loadStandings, renderStandings } from "./standings.js?v=mv4f3bdm";
 import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4f3bdm";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=x";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -31,6 +32,8 @@ let lastStand = 0;
 let lastNews = 0;
 let newsFilter = "all";
 let techKey = null;
+let techView = "upgrades", techPick = null, puOpen = null;
+const ccUi = { ccBy: "driver", ccCum: false };
 let standingsOk = false; // "show anyway" past the spoiler shield
 let lastSlow = 0;          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
 let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
@@ -826,15 +829,35 @@ async function drawNews() {
   const news = await loadNews();
   if (tab === "news") { $("tab-news").innerHTML = renderNews(news, newsFilter); return; }
   if (tab !== "technical") return;
+  const nav = `<div class="filters subnav" id="techNav">${[["upgrades", "Car upgrades"], ["pu", "Power units"], ["cost", "Crash costs"], ["analysis", "Crash analysis & headlines"]].map(([k, l]) => `<button data-tech-view="${k}" class="${techView === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  if (techView === "upgrades") { $("tab-technical").innerHTML = nav + renderUpgrades(await loadTechnical(), techPick); return; }
+  if (techView === "pu") { $("tab-technical").innerHTML = nav + renderPowerUnits(await loadTechnical(), puOpen); return; }
+  if (techView === "cost") { $("tab-technical").innerHTML = nav + renderCrashCost(await loadCrashCost(), ccUi); return; }
   const idx = await loadIncidentIndex();
   const withIncidents = (idx?.sessions ?? []).filter((s) => s.incidents.length);
   const key = techKey ?? withIncidents[0]?.key ?? null;
   const session = key ? await loadIncidents(key) : null;
-  if (document.activeElement?.id !== "techSession") $("tab-technical").innerHTML = renderTechnical(news, idx, session, key);
+  if (document.activeElement?.id !== "techSession") $("tab-technical").innerHTML = nav + renderTechnical(news, idx, session, key);
 }
 $("tab-news").addEventListener("click", (e) => {
   const b = e.target.closest("#newsFilters button");
   if (b) { newsFilter = b.dataset.f; drawNews(); }
+});
+$("tab-technical").addEventListener("click", (e) => {
+  const v = e.target.closest("[data-tech-view]");
+  if (v) { techView = v.dataset.techView; return drawNews(); }
+  const up = e.target.closest("[data-up-round]");
+  if (up) { techPick = { round: Number(up.dataset.upRound), team: up.dataset.upTeam ?? null }; return drawNews(); }
+  const pu = e.target.closest("[data-pu]");
+  if (pu) { puOpen = puOpen === pu.dataset.pu ? null : pu.dataset.pu; return drawNews(); }
+  const by = e.target.closest("#ccBy [data-by]");
+  if (by) { ccUi.ccBy = by.dataset.by; return drawNews(); }
+  const cum = e.target.closest("#ccCum [data-cum]");
+  if (cum) { ccUi.ccCum = cum.dataset.cum === "1"; return drawNews(); }
+});
+$("tab-technical").addEventListener("keydown", (e) => {
+  const pu = e.target.closest?.("[data-pu]");
+  if (pu && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); puOpen = puOpen === pu.dataset.pu ? null : pu.dataset.pu; drawNews(); }
 });
 $("tab-technical").addEventListener("change", (e) => {
   if (e.target.id === "techSession") { techKey = Number(e.target.value); e.target.blur(); drawNews(); }

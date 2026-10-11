@@ -42,7 +42,14 @@ export async function loadStandings() {
   let incidents = [];
   // Preferred source: incidents found in race control messages of archived sessions
   // (this season's official results only say "Retired", not why)
+  // Best source: crash cost estimates (Technical tab → Crash costs), scored in dollars
   try {
+    const r = await fetch(`data/crashcost.json?t=${Math.floor(Date.now() / 3e5)}`);
+    const cc = r.ok ? await r.json() : null;
+    for (const c of cc?.crashes ?? []) incidents.push({ where: `${c.meeting} ${c.session}`, code: c.tla, driver: c.tla, team: c.team, teamId: c.team, colour: c.colour, status: c.evidence, pts: c.cost, kind: c.label });
+    if (incidents.length) { incidents.money = true; incidents.source = `${cc.sessions} archived sessions`; }
+  } catch { /* try the older points table */ }
+  if (!incidents.length) try {
     const r = await fetch(`data/incidents/index.json?t=${Math.floor(Date.now() / 3e5)}`);
     const idx = r.ok ? await r.json() : null;
     for (const s of idx?.sessions ?? []) for (const i of s.incidents) {
@@ -146,6 +153,7 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
   else {
     const byTeam = new Map();
     for (const i of st.incidents) {
+      if (st.incidents.money) { i.teamId = String(i.team ?? "").replace(/\s+(F1 Team|Racing|Team)$/i, ""); }
       const t = byTeam.get(i.teamId) ?? { name: i.team, id: i.teamId, colour: i.colour, pts: 0, list: [] };
       t.pts += i.pts; t.list.push(i); byTeam.set(i.teamId, t);
     }
@@ -154,7 +162,7 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
         <td class="num pos">${i + 1}</td>
         <td><i class="team" style="background:${esc(t.colour ?? teamColour(t.id))}"></i><span class="drv">${esc(t.name)}</span></td>
         <td class="small muted">${t.list.map((x) => `${esc(x.code ?? x.driver)} · ${esc(x.where)} (${esc(x.kind)})`).join("<br>")}</td>
-        <td class="num"><b>${t.pts}</b></td>
+        <td class="num"><b>${st.incidents.money ? (t.pts >= 1e6 ? `$${(t.pts / 1e6).toFixed(2)}M` : `$${Math.round(t.pts / 1000)}k`) : t.pts}</b></td>
       </tr>`).join("")}</tbody></table>`
       : `<div class="muted small">No incidents found yet — this fills in as sessions are archived (the first full-season run is in progress).</div>`;
   }
@@ -172,7 +180,7 @@ export function renderStandings(st, v, { live = false, currentRound = null } = {
         </section>
         <section class="card">
           <div class="card-head"><h2>Destructors' Championship</h2><span class="muted small">unofficial · just for fun</span></div>
-          <p class="muted small">Crashes score 10, a stopped car right before a safety car 8, collisions 6 — found in race control messages${st.incidents?.source ? ` from ${esc(st.incidents.source)}` : ""}. Real repair bills aren't published, so this is the honest version.</p>
+          <p class="muted small">${st.incidents?.money ? `Estimated repair bills from ${esc(st.incidents.source)} — see Technical → Crash costs for how it's worked out.` : `Crashes score 10, a stopped car right before a safety car 8, collisions 6 — found in race control messages${st.incidents?.source ? ` from ${esc(st.incidents.source)}` : ""}.`}</p>
           ${destructors}
         </section>
       </div>
