@@ -29,7 +29,7 @@ const gapStr = (g) => {
 };
 const iso = (ms) => new Date(ms).toISOString();
 
-function trackFromMessage(msg) {
+export function trackFromMessage(msg) {
   const t = String(msg ?? "").toUpperCase();
   if (/CHEQUERED/.test(t)) return null; // "chequeRED FLAG" is not a red flag
   if (/\bRED FLAG/.test(t)) return "5";

@@ -1,0 +1,164 @@
+{
+ "circuits": {
+  "singapore": {
+   "circuit": "Singapore",
+   "green": 23.1,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 20,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2026 Race",
+    "2026 Sprint"
+   ]
+  },
+  "kuala-lumpur": {
+   "circuit": "Kuala Lumpur",
+   "green": 25,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 26,
+    "sc": 2,
+    "vsc": 1
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "baku": {
+   "circuit": "Baku",
+   "green": 26.3,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 2,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "zandvoort": {
+   "circuit": "Zandvoort",
+   "green": 18.7,
+   "sc": null,
+   "vsc": 12.5,
+   "samples": {
+    "green": 36,
+    "sc": 0,
+    "vsc": 5
+   },
+   "sessions": [
+    "2026 Race",
+    "2026 Sprint"
+   ]
+  },
+  "hungaroring": {
+   "circuit": "Hungaroring",
+   "green": 20.3,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 35,
+    "sc": 0,
+    "vsc": 2
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "spa-francorchamps": {
+   "circuit": "Spa-Francorchamps",
+   "green": 21.7,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 7,
+    "sc": 0,
+    "vsc": 1
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "silverstone": {
+   "circuit": "Silverstone",
+   "green": 21.1,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 21,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2026 Race",
+    "2026 Sprint"
+   ]
+  },
+  "spielberg": {
+   "circuit": "Spielberg",
+   "green": 20.3,
+   "sc": null,
+   "vsc": 15.5,
+   "samples": {
+    "green": 33,
+    "sc": 0,
+    "vsc": 5
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "catalunya": {
+   "circuit": "Catalunya",
+   "green": 22.3,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 37,
+    "sc": 0,
+    "vsc": 2
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "monte-carlo": {
+   "circuit": "Monte Carlo",
+   "green": 22.6,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 17,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "montreal": {
+   "circuit": "Montreal",
+   "green": 25.9,
+   "sc": null,
+   "vsc": 17.1,
+   "samples": {
+    "green": 12,
+    "sc": 0,
+    "vsc": 11
+   },
+   "sessions": [
+    "2026 Race",
+    "2026 Sprint"
+   ]
+  }
+ },
+ "scRatio": 0.55,
+ "vscRatio": 0.67
+}

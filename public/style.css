@@ -336,3 +336,7 @@ h2 .chip { font-size: 11px; padding: 3px 8px; vertical-align: middle; margin-lef
 .crash-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .crash-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .crash-svg { width: 100%; height: 70px; background: #13161D; border-radius: 6px; }
+
+/* pit cost table: the circuit being raced now */
+tr.me td { background: rgba(255, 181, 71, 0.08); }
+#pitSrc { font-size: 11px; }

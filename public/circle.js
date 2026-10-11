@@ -29,6 +29,16 @@ function el(tag, attrs = {}, parent) {
   return e;
 }
 
+// What a pit stop costs right now. `pit` is the circuit's profile ({ green, sc, vsc, ratios },
+// measured from past races) or a plain number. Under a safety car / VSC everyone else is
+// driving slowly, so the stop costs much less.
+export function lossFor(pit, code) {
+  const g = typeof pit === "number" ? pit : pit?.green ?? 22;
+  if (code === "4") return pit?.sc ?? g * (pit?.scRatio ?? 0.55);
+  if (code === "6" || code === "7") return pit?.vsc ?? g * (pit?.vscRatio ?? 0.65);
+  return g;
+}
+
 // Gaps to the leader (running total of intervals, so lapped cars work too) and the pit call.
 export function computeModel(v, sel, pitLoss) {
   const rows = v.rows.filter((r) => r.pos < 99 && !r.out);
@@ -47,7 +57,7 @@ export function computeModel(v, sel, pitLoss) {
   const caution = ["4", "6", "7"].includes(v.track.code);
   let pit = null;
   if (selCar) {
-    const loss = caution ? pitLoss * 0.55 : pitLoss;
+    const loss = lossFor(pitLoss, v.track.code);
     const rejoin = selCar.g + loss;
     const others = cars.filter((c) => c !== selCar);
     const ahead = others.filter((c) => c.g < rejoin).sort((a, b) => b.g - a.g)[0];
@@ -198,7 +208,7 @@ export class CircleView {
       const p = m.pit;
       this.callText.textContent = `If ${selCar.tla} pits now → P${p.pos}`;
       this.nearText.textContent = [p.ahead ? `${p.ahead.by.toFixed(1)}s behind ${p.ahead.tla}` : "", p.behind ? `${p.behind.by.toFixed(1)}s ahead of ${p.behind.tla}` : ""].filter(Boolean).join(" · ");
-      this.lossText.textContent = `pit stop costs ~${p.loss.toFixed(0)}s${p.caution ? " under caution" : ""}`;
+      this.lossText.textContent = `pit stop costs ~${p.loss.toFixed(0)}s${p.caution ? ` under ${v.track.code === "4" ? "the safety car" : "the VSC"}` : ""}`;
       this.bandPath.setAttribute("class", p.caution ? "c-band-sc" : "c-band");
     } else {
       this.callText.textContent = "";

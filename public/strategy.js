@@ -1,6 +1,6 @@
 // Strategy tab: predicted finish, pit predictor, battle forecast and the pit stop log.
 // Everything here is a simple, explainable estimate — not a crystal ball.
-import { computeModel } from "./circle.js?v=mv4010kk";
+import { computeModel, lossFor } from "./circle.js?v=mv4bb03z";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const TYRE = { S: "#FF5A5A", M: "#FFD23F", H: "#E8EAF0", I: "#3DDC97", W: "#4A90E2" };
@@ -34,7 +34,7 @@ export function predictFinish(v, pitLoss) {
     const p = pace(r);
     const paceDelta = p && leadPace ? Math.max(-3, Math.min(3, p - leadPace)) : 0;
     const stop = needsStop(r);
-    const projected = c.g + paceDelta * lapsLeft + (stop && lapsLeft > 0 ? pitLoss : 0);
+    const projected = c.g + paceDelta * lapsLeft + (stop && lapsLeft > 0 ? lossFor(pitLoss, "1") : 0);
     return { r, now: r.pos, projected, stop, paceDelta, hasPace: !!(p && leadPace) };
   }).sort((a, b) => a.projected - b.projected).map((x, i) => ({ ...x, pred: i + 1 }));
 }
@@ -108,12 +108,12 @@ export function renderStrategy(v, pitLoss) {
   return `<div class="strategy">
     <section class="card">
       <h2>Predicted finish</h2>
-      <p class="muted small">Current gaps + each driver's recent pace over the ${lapsLeft} laps left + a ${pitLoss}s stop for anyone who still has to pit. Pace needs a few laps after you open the page.</p>
+      <p class="muted small">Current gaps + each driver's recent pace over the ${lapsLeft} laps left + a ${lossFor(pitLoss, "1").toFixed(0)}s stop for anyone who still has to pit. Pace needs a few laps after you open the page.</p>
       <table class="timing compact"><tbody>${predRows}</tbody></table>
     </section>
     <section class="card">
       <h2>If they pit this lap…</h2>
-      <p class="muted small">Where each driver would rejoin. Pit stop ≈ ${pitLoss}s${caution ? `, about ${Math.round(pitLoss * 0.55)}s right now under caution` : ""} (change it on the Circle tab).</p>
+      <p class="muted small">Where each driver would rejoin. Pit stop ≈ ${lossFor(pitLoss, "1").toFixed(0)}s here${caution ? `, about ${lossFor(pitLoss, v.track.code).toFixed(0)}s right now under ${v.track.code === "4" ? "the safety car" : "the VSC"}` : ""} (measured from past races at this circuit — change it on the Circle tab).</p>
       <div class="scroll"><table class="timing compact"><thead><tr><th class="r">P</th><th>DRV</th><th>TYRE · AGE</th><th class="r">REJOIN</th><th>TRAFFIC</th><th></th></tr></thead><tbody>${pitRows}</tbody></table></div>
     </section>
     <section class="card">
@@ -125,4 +125,20 @@ export function renderStrategy(v, pitLoss) {
       <div class="scroll"><table class="timing compact"><thead><tr><th>LAP</th><th>DRV</th><th>TYRES</th><th class="r">PIT LANE</th></tr></thead><tbody>${logHtml}</tbody></table></div>
     </section>
   </div>`;
+}
+
+// Every circuit's measured pit stop cost (green flag / safety car / VSC), from past races.
+export function renderPitTable(data, current) {
+  const list = Object.entries(data?.circuits ?? {}).sort((a, b) => a[1].green - b[1].green);
+  if (!list.length) return "";
+  const cell = (c, kind, ratio) => c[kind] != null ? `${c[kind].toFixed(1)}s` : `<span class="muted">~${(c.green * ratio).toFixed(0)}s</span>`;
+  return `<section class="card">
+      <h2>Pit stop cost at every circuit</h2>
+      <p class="muted small">Measured from real races: in-lap + out-lap compared with normal laps (and, under a safety car or VSC, with the cars that stayed out). Greyed numbers are estimates — no stop under that condition there yet. The site picks the right one automatically.</p>
+      <div class="scroll"><table class="timing compact"><thead><tr><th>CIRCUIT</th><th class="r">GREEN</th><th class="r">SAFETY CAR</th><th class="r">VSC</th><th class="r">STOPS</th><th>FROM</th></tr></thead><tbody>
+      ${list.map(([slug, c]) => `<tr class="${slug === current ? "me" : ""}"><td class="drv">${esc(c.circuit)}</td><td class="num"><b>${c.green.toFixed(1)}s</b></td>
+        <td class="num">${cell(c, "sc", data.scRatio)}</td><td class="num">${cell(c, "vsc", data.vscRatio)}</td>
+        <td class="num muted">${c.samples.green + c.samples.sc + c.samples.vsc}</td><td class="muted small">${esc([...new Set(c.sessions)].join(", "))}</td></tr>`).join("")}
+      </tbody></table></div>
+    </section>`;
 }

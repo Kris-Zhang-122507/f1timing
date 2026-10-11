@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv4010kk">
+<link rel="stylesheet" href="style.css?v=mv4bb03z">
 </head>
 <body>
 <div class="wrap">
@@ -83,12 +83,12 @@
         <div class="filters"><button id="viewCircle" class="on">Circle</button><button id="viewTrack">Track map</button></div>
         <span class="muted small" id="circleSel">Tap a car to make it the reference</span>
         <button class="btn" id="circleClear" hidden>Clear</button>
-        <label class="muted small">Pit stop costs <input type="number" id="pitLoss" min="10" max="45" step="1" value="24"> s</label>
+        <label class="muted small">Pit stop costs <input type="number" id="pitLoss" min="5" max="60" step="1" value="22"> s <span id="pitSrc"></span></label> <button class="btn" id="pitReset" hidden>Use measured</button>
       </div>
     </div>
     <div id="circle" class="circle-wrap"></div>
     <div id="trackMap" class="circle-wrap" hidden></div>
-    <p class="muted small">Cars are placed by their timing gap behind the leader. Red arcs = within a second. The shaded band shows where the selected car would rejoin if it pitted now.</p>
+    <p class="muted small">Cars are placed by their timing gap behind the leader. Red arcs = within a second. The shaded band shows where the selected car would rejoin if it pitted now — it shrinks automatically under a safety car or VSC, when a stop costs much less.</p>
   </section>
 
   <section class="card" id="tab-tyres" hidden>
@@ -175,6 +175,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv4010kk"></script>
+<script type="module" src="app.js?v=mv4bb03z"></script>
 </body>
 </html>

@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4010kk";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4010kk";
-import { CircleView } from "./circle.js?v=mv4010kk";
-import { renderTyres } from "./tyres.js?v=mv4010kk";
-import { renderStrategy } from "./strategy.js?v=mv4010kk";
-import { renderCompare } from "./compare.js?v=mv4010kk";
-import { renderRewind } from "./rewind.js?v=mv4010kk";
-import { renderDriver } from "./driver.js?v=mv4010kk";
-import { Player, parseRecording } from "./player.js?v=mv4010kk";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4010kk";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv4010kk";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4010kk";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4010kk";
+import { LiveState } from "./lib/state.js?v=mv4bb03z";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4bb03z";
+import { CircleView } from "./circle.js?v=mv4bb03z";
+import { renderTyres } from "./tyres.js?v=mv4bb03z";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4bb03z";
+import { renderCompare } from "./compare.js?v=mv4bb03z";
+import { renderRewind } from "./rewind.js?v=mv4bb03z";
+import { renderDriver } from "./driver.js?v=mv4bb03z";
+import { Player, parseRecording } from "./player.js?v=mv4bb03z";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4bb03z";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv4bb03z";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4bb03z";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4bb03z";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -31,8 +31,21 @@ let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
 let dvSel = null;
 try { dvSel = localStorage.getItem("undercut.driver"); } catch {}
 let circleSel = null;
-let pitLoss = 24;
-try { pitLoss = Number(localStorage.getItem("undercut.pitLoss")) || 24; } catch {}
+// What a pit stop costs: measured per circuit from past races (data/pitloss.json, rebuilt by the
+// hourly job). If you type your own number it's remembered for that circuit only.
+let pitData = null;
+let pitMine = {};
+try { pitMine = JSON.parse(localStorage.getItem("undercut.pitLossBy") || "{}"); } catch {}
+fetch(`data/pitloss.json?t=${Math.floor(Date.now() / 36e5)}`).then((r) => (r.ok ? r.json() : null)).then((d) => { pitData = d; if (view) render(); }).catch(() => {});
+let pitLoss = { green: 22 };
+function pitProfile(v) {
+  const slug = circuitSlug(v?.session?.circuit);
+  const d = pitData?.circuits?.[slug], mine = pitMine[slug];
+  const ratios = { scRatio: pitData?.scRatio ?? 0.55, vscRatio: pitData?.vscRatio ?? 0.65 };
+  if (mine) return { green: mine, ...ratios, slug, source: "your number" };
+  if (d) return { ...d, ...ratios, slug, source: `measured from ${d.samples.green} stops here` };
+  return { green: 22, ...ratios, slug, source: "typical value — no races here yet" };
+}
 
 // Minisector status codes from the F1 feed
 function segClass(s) {
@@ -391,9 +404,10 @@ function render() {
   if (tab === "schedule" && Date.now() - lastSched > 5000) drawSchedule(v);
   if (tab === "standings" && Date.now() - lastStand > 5000) drawStandings(v);
   if ((tab === "news" || tab === "technical") && Date.now() - lastNews > 30000) drawNews();
+  pitLoss = pitProfile(v);
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
-  if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
+  if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss) + renderPitTable(pitData, pitLoss.slug); }
   if (["compare", "rewind", "driver"].includes(tab) && Date.now() - lastSlow > 2000) drawSlow(v);
 }
 
@@ -459,6 +473,9 @@ function telemetryFor(v) {
 function updateCircle(v) {
   if (v.now && v.now !== clockBase.now) clockBase = { now: v.now, at: Date.now() };
   circleView.setData(v, circleSel, pitLoss, circleNow);
+  if (document.activeElement !== $("pitLoss")) $("pitLoss").value = Math.round(pitLoss.green);
+  $("pitSrc").textContent = `(${pitLoss.source})`;
+  $("pitReset").hidden = pitLoss.source !== "your number";
   if (circleMode === "track") loadTrack(v.session.circuit).then((pts) => trackView.setPoints(pts));
   const sel = v.rows.find((r) => r.n === circleSel);
   $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";
@@ -857,10 +874,18 @@ $("tabs").addEventListener("click", (e) => {
   if (view) render();
 });
 $("circleClear").addEventListener("click", () => { circleSel = null; if (view) updateCircle(view); });
-$("pitLoss").value = pitLoss;
 $("pitLoss").addEventListener("input", (e) => {
-  pitLoss = Number(e.target.value) || 24;
-  try { localStorage.setItem("undercut.pitLoss", String(pitLoss)); } catch {}
+  const n = Number(e.target.value), slug = pitProfile(view).slug;
+  if (!slug || !(n >= 5 && n <= 60)) return;
+  pitMine[slug] = n;
+  try { localStorage.setItem("undercut.pitLossBy", JSON.stringify(pitMine)); } catch {}
+  pitLoss = pitProfile(view);
+  if (view) updateCircle(view);
+});
+$("pitReset").addEventListener("click", () => {
+  delete pitMine[pitProfile(view).slug];
+  try { localStorage.setItem("undercut.pitLossBy", JSON.stringify(pitMine)); } catch {}
+  pitLoss = pitProfile(view);
   if (view) updateCircle(view);
 });
 

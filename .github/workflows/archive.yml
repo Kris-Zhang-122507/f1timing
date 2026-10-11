@@ -32,6 +32,9 @@ jobs:
         run: node scripts/archive.mjs "" "${{ github.event.inputs.meetings || '4' }}"
       - name: Latest headlines
         run: node scripts/news.mjs
+      - name: Pit stop cost per circuit
+        run: node scripts/pitloss.mjs --history 0 12
+        continue-on-error: true
       - name: Save new data
         run: |
           git config user.name "undercut-archive"
