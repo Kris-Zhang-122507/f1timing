@@ -1,8 +1,8 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3u3sxe";
-import { Race } from "./lib/race.js?v=mv3u3sxe";
-import { CircleView } from "./circle.js?v=mv3u3sxe";
-import { renderTyres } from "./tyres.js?v=mv3u3sxe";
+import { LiveState } from "./lib/state.js?v=mv3ui1yn";
+import { Race } from "./lib/race.js?v=mv3ui1yn";
+import { CircleView } from "./circle.js?v=mv3ui1yn";
+import { renderTyres } from "./tyres.js?v=mv3ui1yn";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -157,6 +157,7 @@ function render() {
     renderStory(v);
     renderRcm(v);
   }
+  handleRadio(v);
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
 }
@@ -271,6 +272,48 @@ $("rcFilters").addEventListener("click", (e) => {
   rcFilter = b.dataset.f;
   for (const x of $("rcFilters").children) x.classList.toggle("on", x === b);
   if (view) renderRcm(view);
+});
+
+// ---------- team radio ----------
+// One shared audio player. The list is only rebuilt when a new clip arrives, so the
+// play buttons don't get swapped out from under your mouse.
+const player = new Audio();
+let playing = null;
+let radioKey = "";
+let heard = new Set();
+let radioPrimed = false;
+const PLAY = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>`;
+const STOP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>`;
+
+function handleRadio(v) {
+  const clips = v.radio ?? [];
+  // clips already there when the page opened aren't "new"
+  if (!radioPrimed && clips.length) { for (const c of clips) heard.add(c.url); radioPrimed = true; }
+  const fresh = clips.filter((c) => !heard.has(c.url));
+  if (fresh.length && $("radioAuto").checked && !playing) play(fresh[fresh.length - 1].url);
+  const key = clips.map((c) => c.url).join("|") + (playing ?? "");
+  if (key === radioKey || tab !== "overview") return;
+  radioKey = key;
+  $("radio").innerHTML = clips.length ? clips.map((c) => `<div class="radio-item ${heard.has(c.url) ? "" : "new"}">
+    <button class="play ${playing === c.url ? "on" : ""}" data-url="${esc(c.url)}" aria-label="${playing === c.url ? "Stop" : "Play"} ${esc(c.name || c.tla)} radio">${playing === c.url ? STOP : PLAY}</button>
+    <div>
+      <div class="who"><i style="background:${esc(c.colour)}"></i>${esc(c.tla)}</div>
+      <div class="meta">${c.lap ? "L" + c.lap + " · " : ""}${esc(c.t)} UTC</div>
+    </div>
+  </div>`).join("") : `<div class="muted small">No team radio yet this session.</div>`;
+}
+
+function play(url) {
+  heard.add(url);
+  if (playing === url) { player.pause(); playing = null; }
+  else { player.src = url; player.play().catch(() => { playing = null; radioKey = ""; if (view) handleRadio(view); }); playing = url; }
+  radioKey = "";
+  if (view) handleRadio(view);
+}
+player.addEventListener("ended", () => { playing = null; radioKey = ""; if (view) handleRadio(view); });
+$("radio").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-url]");
+  if (b) play(b.dataset.url);
 });
 
 // ---------- tabs + circle controls ----------

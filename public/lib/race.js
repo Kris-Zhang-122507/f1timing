@@ -108,6 +108,7 @@ export class Race {
     this.lapStart = {};          // driver -> time they last crossed the line
     this.lapHist = {};           // driver -> [{ lap, s (seconds), tyre }]
     this.watchingSince = null;
+    this.radioLap = {};          // clip path -> lap it arrived on
   }
 
   get lap() {
@@ -132,6 +133,9 @@ export class Race {
     const track = String(d.TrackStatus?.Status ?? "");
     const lap = this.lap;
     if (this.watchingSince === null && lap > 0) this.watchingSince = lap;
+
+    // remember which lap each team radio clip arrived on (the feed only gives a time)
+    for (const c of list(d.TeamRadio?.Captures)) if (c?.Path && !(c.Path in this.radioLap)) this.radioLap[c.Path] = lap || null;
 
     // Track status changes
     if (track && track !== this.lastTrack) {
@@ -292,6 +296,13 @@ export class Race {
       battles.push({ pos: a.pos, chaser: b.tla, chaserColour: b.colour, ahead: a.tla, aheadColour: a.colour, gap, trend, hist: h });
     }
 
+    // Team radio clips are public audio files next to the session's timing data
+    const base = d.SessionInfo?.Path ? `https://livetiming.formula1.com/static/${d.SessionInfo.Path}` : null;
+    const radio = base ? list(d.TeamRadio?.Captures).slice(-40).reverse().map((c) => {
+      const info = drivers[c.RacingNumber] ?? {};
+      return { url: base + c.Path, t: (c.Utc ?? "").slice(11, 19), lap: this.radioLap[c.Path] ?? null, n: c.RacingNumber, tla: info.Tla ?? c.RacingNumber, name: info.FullName ?? "", colour: info.TeamColour ? `#${info.TeamColour}` : "#888" };
+    }) : [];
+
     const rcm = list(d.RaceControlMessages?.Messages).slice(-40).reverse().map((m) => ({
       t: (m.Utc ?? "").slice(11, 19),
       lap: m.Lap ?? "",
@@ -322,6 +333,7 @@ export class Race {
       battles,
       story: this.story.slice(-40).reverse(),
       rcm,
+      radio,
       messages: this.state.messages,
       now: this.now(),
       watchingSince: this.watchingSince,
