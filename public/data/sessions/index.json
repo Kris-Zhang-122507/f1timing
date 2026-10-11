@@ -21,7 +21,7 @@
    "laps": 62,
    "telemetry": true,
    "incidents": 0,
-   "v": 3,
+   "v": 4,
    "gps": true
   },
   {
@@ -34,7 +34,7 @@
    "type": "Qualifying",
    "startUtc": "2026-10-10T13:00:00+00:00",
    "file": "11384.jsonl.gz",
-   "sizeKb": 46,
+   "sizeKb": 45,
    "score": 3,
    "reasons": [
     "incredibly tight at the top"
@@ -42,7 +42,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11383,
@@ -65,7 +65,7 @@
    "laps": 20,
    "telemetry": true,
    "incidents": 6,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11379,
@@ -86,7 +86,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11731,
@@ -98,7 +98,7 @@
    "type": "Race",
    "startUtc": "2026-10-04T07:00:00+00:00",
    "file": "11731.jsonl.gz",
-   "sizeKb": 409,
+   "sizeKb": 403,
    "score": 5,
    "reasons": [
     "lots of overtaking",
@@ -110,7 +110,7 @@
    "laps": 55,
    "telemetry": true,
    "incidents": 6,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11730,
@@ -128,7 +128,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11377,
@@ -151,7 +151,7 @@
    "laps": 51,
    "telemetry": true,
    "incidents": 4,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11373,
@@ -169,7 +169,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11369,
@@ -190,7 +190,7 @@
     "several retirements"
    ],
    "laps": 57,
-   "v": 3,
+   "v": 4,
    "telemetry": true,
    "incidents": 2
   },
@@ -212,7 +212,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11361,
@@ -224,7 +224,7 @@
    "type": "Race",
    "startUtc": "2026-09-06T13:00:00+00:00",
    "file": "11361.jsonl.gz",
-   "sizeKb": 381,
+   "sizeKb": 378,
    "score": 5,
    "reasons": [
     "lots of overtaking",
@@ -234,7 +234,7 @@
     "several retirements"
    ],
    "laps": 53,
-   "v": 3,
+   "v": 4,
    "telemetry": true,
    "incidents": 0
   },
@@ -256,7 +256,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11353,
@@ -268,7 +268,7 @@
    "type": "Race",
    "startUtc": "2026-08-23T13:00:00+00:00",
    "file": "11353.jsonl.gz",
-   "sizeKb": 495,
+   "sizeKb": 492,
    "score": 4,
    "reasons": [
     "some good passing",
@@ -280,7 +280,7 @@
    "laps": 72,
    "telemetry": true,
    "incidents": 2,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11349,
@@ -300,7 +300,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11348,
@@ -321,7 +321,7 @@
    "laps": 24,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11344,
@@ -341,7 +341,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11342,
@@ -364,7 +364,7 @@
    "laps": 70,
    "telemetry": true,
    "incidents": 4,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11338,
@@ -384,7 +384,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11334,
@@ -408,7 +408,7 @@
    "laps": 45,
    "telemetry": true,
    "incidents": 6,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11330,
@@ -428,7 +428,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11326,
@@ -452,7 +452,7 @@
    "laps": 52,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11322,
@@ -472,7 +472,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11321,
@@ -494,7 +494,7 @@
    "laps": 17,
    "telemetry": true,
    "incidents": 2,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11317,
@@ -514,7 +514,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11315,
@@ -538,7 +538,7 @@
    "laps": 71,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11311,
@@ -558,7 +558,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11307,
@@ -581,7 +581,7 @@
    "laps": 66,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11303,
@@ -602,7 +602,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11299,
@@ -614,7 +614,7 @@
    "type": "Race",
    "startUtc": "2026-06-07T13:00:00+00:00",
    "file": "11299.jsonl.gz",
-   "sizeKb": 488,
+   "sizeKb": 486,
    "score": 4,
    "reasons": [
     "some good passing",
@@ -625,7 +625,7 @@
    "laps": 78,
    "telemetry": true,
    "incidents": 3,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11295,
@@ -646,7 +646,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11291,
@@ -669,7 +669,7 @@
    "laps": 68,
    "telemetry": true,
    "incidents": 4,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11287,
@@ -689,7 +689,7 @@
    "laps": null,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   },
   {
    "key": 11286,
@@ -711,8 +711,8 @@
    "laps": 23,
    "telemetry": true,
    "incidents": 0,
-   "v": 3
+   "v": 4
   }
  ],
- "updated": "2026-10-11T22:15:48.404Z"
+ "updated": "2026-10-11T23:10:08.278Z"
 }

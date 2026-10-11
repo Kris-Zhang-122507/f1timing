@@ -213,16 +213,17 @@
   },
   "shanghai": {
    "circuit": "Shanghai",
-   "green": 21.6,
+   "green": 21.8,
    "sc": null,
    "vsc": null,
    "samples": {
-    "green": 24,
+    "green": 25,
     "sc": 0,
     "vsc": 0
    },
    "sessions": [
-    "2025 Race"
+    "2025 Race",
+    "2025 Sprint"
    ]
   },
   "suzuka": {
@@ -269,16 +270,17 @@
   },
   "miami": {
    "circuit": "Miami",
-   "green": 19.3,
+   "green": 16,
    "sc": null,
    "vsc": 10.5,
    "samples": {
-    "green": 1,
+    "green": 4,
     "sc": 0,
     "vsc": 3
    },
    "sessions": [
-    "2025 Race"
+    "2025 Race",
+    "2025 Sprint"
    ]
   },
   "imola": {
@@ -306,7 +308,8 @@
     "vsc": 1
    },
    "sessions": [
-    "2025 Race"
+    "2025 Race",
+    "2025 Sprint"
    ]
   },
   "mexico-city": {
@@ -334,7 +337,8 @@
     "vsc": 0
    },
    "sessions": [
-    "2025 Race"
+    "2025 Race",
+    "2025 Sprint"
    ]
   },
   "las-vegas": {
@@ -353,16 +357,17 @@
   },
   "lusail": {
    "circuit": "Lusail",
-   "green": 25.9,
+   "green": 26,
    "sc": null,
    "vsc": null,
    "samples": {
-    "green": 22,
+    "green": 25,
     "sc": 0,
     "vsc": 0
    },
    "sessions": [
-    "2025 Race"
+    "2025 Race",
+    "2025 Sprint"
    ]
   },
   "yas-marina-circuit": {
