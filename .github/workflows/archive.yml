@@ -22,7 +22,7 @@ concurrency:
 jobs:
   archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +30,8 @@ jobs:
           node-version: 22
       - name: Download finished sessions
         run: node scripts/archive.mjs "" "${{ github.event.inputs.meetings || '4' }}"
+      - name: Latest headlines
+        run: node scripts/news.mjs
       - name: Save new data
         run: |
           git config user.name "undercut-archive"

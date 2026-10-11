@@ -11,16 +11,31 @@
 // Note: OpenF1 locks its free API while any session is live, so runs during a session
 // just skip and try again next hour.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { gzipSync } from "node:zlib";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { LiveState } from "../public/lib/state.js";
 import { Race } from "../public/lib/race.js";
 import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry } from "../public/lib/openf1.js";
+import { extractIncidents, analyseCrash } from "./incidents.mjs";
 
 const YEAR = Number(process.argv[2]) || new Date().getUTCFullYear();
 const MEETINGS_BACK = Number(process.argv[3]) || 4;
 const OUT = "public/data/sessions";
 const TRACKS = "public/data/tracks";
 const TELEMETRY = "public/data/telemetry";
+const INCIDENTS = "public/data/incidents";
+
+// Crashes, collisions and stopped cars for one session, with a crash analysis for the
+// serious ones. Saved per session; the season summary feeds the Destructors' Championship.
+async function saveIncidents(entry, lines) {
+  const list = extractIncidents(lines);
+  for (const inc of list.filter((i) => i.kind === "crash" || i.kind === "collision").slice(0, 8)) {
+    try { inc.analysis = await analyseCrash(entry.key, inc); } catch (e) { log(`  no crash data for ${inc.tla}: ${e.message}`); }
+    await pause(WAIT);
+  }
+  writeFileSync(`${INCIDENTS}/${entry.key}.json`, JSON.stringify({ key: entry.key, meeting: entry.meeting, name: entry.name, startUtc: entry.startUtc, incidents: list }));
+  entry.incidents = list.length;
+  return list.length;
+}
 const slug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const WAIT = process.env.OPENF1_WAIT ? Number(process.env.OPENF1_WAIT) : 2200;
@@ -96,6 +111,7 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   mkdirSync(TRACKS, { recursive: true });
   mkdirSync(TELEMETRY, { recursive: true });
+  mkdirSync(INCIDENTS, { recursive: true });
   const idxPath = `${OUT}/index.json`;
   const index = existsSync(idxPath) ? JSON.parse(readFileSync(idxPath, "utf8")) : { sessions: [] };
   const have = new Set(index.sessions.map((s) => s.key));
@@ -150,7 +166,9 @@ async function main() {
         await pause(WAIT);
       }
       if (Object.keys(tele.drivers).length) writeFileSync(`${TELEMETRY}/${s.session_key}.json`, JSON.stringify(tele));
-      index.sessions[index.sessions.length - 1].telemetry = Object.keys(tele.drivers).length > 0;
+      const entry = index.sessions[index.sessions.length - 1];
+      entry.telemetry = Object.keys(tele.drivers).length > 0;
+      await saveIncidents(entry, lines);
 
       notice(`Saved ${s.country_name} ${s.session_name}: ${lines.length} messages, ${Math.round(gz.length / 1024)} KB, worth watching ${rating.score}/5`);
     } catch (e) {
@@ -159,6 +177,26 @@ async function main() {
     }
   }
   index.sessions.sort((a, b) => (b.startUtc ?? "").localeCompare(a.startUtc ?? ""));
+  // older archived sessions that don't have incident data yet: work it out from the saved replay
+  for (const entry of index.sessions) {
+    if (existsSync(`${INCIDENTS}/${entry.key}.json`) || !existsSync(`${OUT}/${entry.file}`)) continue;
+    try {
+      const lines = gunzipSync(readFileSync(`${OUT}/${entry.file}`)).toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      const n = await saveIncidents(entry, lines);
+      log(`Incidents for ${entry.meeting} ${entry.name}: ${n}`);
+    } catch (e) {
+      if (/401/.test(e.message)) break;
+      log(`Couldn't work out incidents for ${entry.key}: ${e.message}`);
+    }
+  }
+
+  // season summary for the Destructors' Championship
+  const season = index.sessions.filter((e) => existsSync(`${INCIDENTS}/${e.key}.json`)).map((e) => {
+    const d = JSON.parse(readFileSync(`${INCIDENTS}/${e.key}.json`, "utf8"));
+    return { key: e.key, meeting: e.meeting, name: e.name, startUtc: e.startUtc, incidents: d.incidents.map(({ analysis, ...rest }) => ({ ...rest, peakG: analysis?.peakG ?? null })) };
+  });
+  writeIfChanged(`${INCIDENTS}/index.json`, { sessions: season });
+
   writeIfChanged(idxPath, { sessions: index.sessions });
   notice(`Done: ${added} new session(s), ${index.sessions.length} archived in total`);
 }
