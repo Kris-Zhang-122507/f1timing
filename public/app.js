@@ -1,20 +1,20 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4g1pmh";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4g1pmh";
-import { CircleView } from "./circle.js?v=mv4g1pmh";
-import { renderTyres } from "./tyres.js?v=mv4g1pmh";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4g1pmh";
-import { renderCompare } from "./compare.js?v=mv4g1pmh";
-import { renderRewind } from "./rewind.js?v=mv4g1pmh";
-import { renderDriver } from "./driver.js?v=mv4g1pmh";
-import { Player, parseRecording } from "./player.js?v=mv4g1pmh";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4g1pmh";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4g1pmh";
-import { Dashboard } from "./dash.js?v=mv4g1pmh";
-import { CarTelemetry } from "./telemetry.js?v=mv4g1pmh";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4g1pmh";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4g1pmh";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4g1pmh";
+import { LiveState } from "./lib/state.js?v=mv4g7znc";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4g7znc";
+import { CircleView } from "./circle.js?v=mv4g7znc";
+import { renderTyres } from "./tyres.js?v=mv4g7znc";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4g7znc";
+import { renderCompare } from "./compare.js?v=mv4g7znc";
+import { renderRewind } from "./rewind.js?v=mv4g7znc";
+import { renderDriver } from "./driver.js?v=mv4g7znc";
+import { Player, parseRecording } from "./player.js?v=mv4g7znc";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4g7znc";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4g7znc";
+import { Dashboard } from "./dash.js?v=mv4g7znc";
+import { CarTelemetry } from "./telemetry.js?v=mv4g7znc";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4g7znc";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4g7znc";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4g7znc";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
