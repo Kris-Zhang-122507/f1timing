@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3xw3wn";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3xw3wn";
-import { CircleView } from "./circle.js?v=mv3xw3wn";
-import { renderTyres } from "./tyres.js?v=mv3xw3wn";
-import { renderStrategy } from "./strategy.js?v=mv3xw3wn";
-import { renderCompare } from "./compare.js?v=mv3xw3wn";
-import { renderRewind } from "./rewind.js?v=mv3xw3wn";
-import { renderDriver } from "./driver.js?v=mv3xw3wn";
-import { Player, parseRecording } from "./player.js?v=mv3xw3wn";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3xw3wn";
-import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3xw3wn";
-import { loadStandings, renderStandings } from "./standings.js?v=mv3xw3wn";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv3xw3wn";
+import { LiveState } from "./lib/state.js?v=mv4010kk";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4010kk";
+import { CircleView } from "./circle.js?v=mv4010kk";
+import { renderTyres } from "./tyres.js?v=mv4010kk";
+import { renderStrategy } from "./strategy.js?v=mv4010kk";
+import { renderCompare } from "./compare.js?v=mv4010kk";
+import { renderRewind } from "./rewind.js?v=mv4010kk";
+import { renderDriver } from "./driver.js?v=mv4010kk";
+import { Player, parseRecording } from "./player.js?v=mv4010kk";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4010kk";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv4010kk";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4010kk";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4010kk";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

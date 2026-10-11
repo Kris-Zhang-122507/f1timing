@@ -35,11 +35,13 @@ const list = (v) => (Array.isArray(v) ? v : Object.values(v ?? {}));
 
 // ---------- plain-English notes for FIA race control messages ----------
 const RULES = [
-  [/VIRTUAL SAFETY CAR DEPLOYED/, "Everyone slows to a set pace. Pit stops cost roughly half the usual time, so expect a rush into the pits."],
+  [/CHEQUERED FLAG/, "That's the end of the session."],
+  [/VIRTUAL SAFETY CAR ENDING|VSC ENDING/, "Racing resumes in a few seconds — watch for drivers who timed their restart well."],
+  [/VIRTUAL SAFETY CAR DEPLOYED|VSC DEPLOYED/, "Everyone slows to a set pace. Pit stops cost roughly half the usual time, so expect a rush into the pits."],
   [/VIRTUAL SAFETY CAR ENDING/, "Racing resumes in a few seconds — watch for drivers who timed their restart well."],
   [/SAFETY CAR DEPLOYED/, "The safety car bunches the field up. Gaps disappear and pit stops become much cheaper."],
   [/SAFETY CAR IN THIS LAP/, "Restart at the end of this lap. The leader controls the pace until then."],
-  [/RED FLAG/, "Session stopped. Cars return to the pit lane and teams can usually change tyres for free."],
+  [/\bRED FLAG/, "Session stopped. Cars return to the pit lane and teams can usually change tyres for free."],
   [/DOUBLE YELLOW/, "Serious hazard: drivers must slow right down, can't overtake, and must be ready to stop."],
   [/YELLOW/, "Hazard on track: no overtaking in that sector."],
   [/CLEAR IN TRACK SECTOR|GREEN LIGHT/, "Hazard cleared — normal racing in that part of the track."],
@@ -59,6 +61,12 @@ const RULES = [
   [/CHEQUERED FLAG/, "That's the end of the session."],
   [/DRS ENABLED/, "Overtaking aids are now allowed."],
   [/DRS DISABLED/, "Overtaking aids switched off — usually for rain or a hazard."],
+  [/OVERTAKE ENABLED/, "Overtake mode is switched on: a car within a second of the one ahead gets extra electric power to attack."],
+  [/OVERTAKE DISABLED/, "Overtake mode is switched off for now — usually at the start, behind a safety car or for a hazard."],
+  [/PIT LANE ENTRY CLOSED/, "Nobody can come in for a pit stop right now."],
+  [/PIT LANE ENTRY OPEN/, "Pit stops are allowed again."],
+  [/TRACK SURFACE SLIPPERY/, "Oil, water or debris on track — expect drivers to back off there."],
+  [/RACE START|SESSION STARTED/, "And they're off."],
   [/RISK OF RAIN/, "Rain expected — tyre choices are about to get interesting."],
 ];
 
@@ -75,15 +83,16 @@ function categoryOf(m) {
   if (/PENALTY|DRIVE THROUGH|STOP AND GO/.test(t)) return "penalty";
   if (/INVESTIGAT|NOTED|REVIEWED/.test(t)) return "investigation";
   if (/TRACK LIMITS|BLACK AND WHITE/.test(t)) return "limits";
-  if (m.Category === "Flag" || m.Category === "SafetyCar" || /FLAG|SAFETY CAR/.test(t)) return "flag";
+  if (m.Category === "Flag" || m.Category === "SafetyCar" || /FLAG|SAFETY CAR|\bVSC\b/.test(t)) return "flag";
   return "other";
 }
 
 function flagColour(m) {
   const t = `${m.Flag ?? ""} ${m.Message ?? ""}`;
-  if (/RED/.test(t)) return "red";
+  if (/CHEQUERED/.test(t)) return "chequered";
+  if (/\bRED\b/.test(t)) return "red";
   if (/DOUBLE YELLOW|YELLOW/.test(t)) return "yellow";
-  if (/SAFETY CAR/.test(t)) return "amber";
+  if (/SAFETY CAR|\bVSC\b/.test(t)) return "amber";
   if (/BLUE/.test(t)) return "blue";
   if (/GREEN|CLEAR/.test(t)) return "green";
   if (/PENALTY/.test(t)) return "penalty";
@@ -109,6 +118,8 @@ export class Race {
     this.radioLap = {};          // clip path -> lap it arrived on
     this.pitTimes = {};          // driver -> [{ lap, dur }] pit lane times seen
     this.posHist = {};           // driver -> [{ lap, pos }] position at the end of each lap
+    this.pendingOvertakes = [];  // waiting to be sure they weren't just a pit stop
+    this.pitAt = {};             // driver -> last time seen in or leaving the pits
   }
 
   get lap() {
@@ -119,11 +130,11 @@ export class Race {
     return this.state.data.DriverList?.[n]?.Tla ?? n;
   }
 
-  add(type, head, body = "") {
+  add(type, head, body = "", lap = this.lap) {
     // skip duplicates of a recent event (the feed sometimes repeats itself)
     const t = this.now();
     if (this.story.slice(-5).some((e) => e.head === head && t - e.t < 60000)) return;
-    this.story.push({ type, head, body, lap: this.lap, t });
+    this.story.push({ type, head, body, lap, t });
     if (this.story.length > 80) this.story.shift();
   }
 
@@ -160,6 +171,17 @@ export class Race {
       if (["4", "6", "7", "5"].includes(track) && lap) this.lapEvents[lap] = "sc";
       this.lastTrack = track;
     }
+
+    // A car slowing into the pit lane loses places a few seconds before it's marked as
+    // pitting, so an "overtake" only counts if neither car pits within 25 seconds of it.
+    const tNow = this.now();
+    for (const [n, l] of Object.entries(lines)) if (l.InPit || l.PitOut) this.pitAt[n] = tNow;
+    this.pendingOvertakes = this.pendingOvertakes.filter((o) => {
+      if (tNow - o.t < 25000) return true;
+      const pitted = [o.a, o.b].some((n) => this.pitAt[n] != null && this.pitAt[n] >= o.t - 30000);
+      if (!pitted) this.add("overtake", `${this.driverName(o.a)} passes ${this.driverName(o.b)} for P${o.pos}`, "", o.lap);
+      return false;
+    });
 
     const now = {};
     for (const [n, l] of Object.entries(lines)) {
@@ -230,7 +252,7 @@ export class Race {
             for (const b of Object.keys(now)) {
               if (a === b || !before[a] || !before[b] || busy(a) || busy(b)) continue;
               if (before[a].pos > before[b].pos && now[a].pos < now[b].pos && now[a].pos === now[b].pos - 1) {
-                this.add("overtake", `${this.driverName(a)} passes ${this.driverName(b)} for P${now[a].pos}`, "");
+                this.pendingOvertakes.push({ a, b, pos: now[a].pos, t: this.now(), lap });
               }
             }
           }
@@ -256,9 +278,9 @@ export class Race {
       const t = String(m?.Message ?? "").toUpperCase();
       const lap = Number(m?.Lap) || null;
       if (!lap) continue;
-      if (/SAFETY CAR DEPLOYED/.test(t)) scFrom ??= lap;
+      if (/SAFETY CAR DEPLOYED|\bVSC DEPLOYED/.test(t)) scFrom ??= lap;
       else if (scFrom != null && /SAFETY CAR IN THIS LAP|VIRTUAL SAFETY CAR ENDING|VSC ENDING|TRACK CLEAR|GREEN LIGHT/.test(t)) { mark(scFrom, lap, "sc"); scFrom = null; }
-      if (/RED FLAG/.test(t)) redFrom ??= lap;
+      if (/\bRED FLAG/.test(t) && !/CHEQUERED/.test(t)) redFrom ??= lap;
       else if (redFrom != null && /GREEN LIGHT|PIT EXIT OPEN|RESUME/.test(t)) { mark(redFrom, lap, "red"); redFrom = null; }
       if (/YELLOW/.test(t) && !/CLEAR/.test(t) && !out[lap]) out[lap] = "yellow";
     }

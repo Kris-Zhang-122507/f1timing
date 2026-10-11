@@ -14,7 +14,17 @@ export function parseRecording(text) {
     else if (m.topic) lines.push({ ms, topic: m.topic, data: m.data });
   }
   lines.sort((a, b) => a.ms - b.ms);
-  return lines;
+  // Clean up two quirks in older replay files: a lap counter that briefly goes backwards,
+  // and the chequered flag being mistaken for a red flag.
+  let maxLap = 0;
+  return lines.filter((l) => {
+    if (l.topic === "LapCount" && l.data?.CurrentLap != null) {
+      if (l.data.CurrentLap < maxLap) return false;
+      maxLap = l.data.CurrentLap;
+    }
+    if (l.topic === "TrackStatus" && String(l.data?.Status) === "5" && /CHEQUERED/i.test(l.data?.Message ?? "")) return false;
+    return true;
+  });
 }
 
 // Things worth marking on the timeline, found by skimming the recording once.
@@ -68,6 +78,8 @@ export class Player {
     this.idx = 0;
     this.now = this.first;
     this.reset();
+    // archived races begin long before the start — jump to two minutes before lights out
+    if (this.start && this.start - this.first > 5 * 60000) this.seek(this.start - 120000);
     this.playing = true;
     this.onChange();
   }

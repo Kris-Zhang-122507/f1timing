@@ -40,6 +40,9 @@ const slug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const WAIT = process.env.OPENF1_WAIT ? Number(process.env.OPENF1_WAIT) : 2200;
 const KEEP = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
+// Bump when the replay builder changes in a way worth rebuilding old files for.
+// 2: lap counter never goes backwards; chequered flag no longer read as a red flag.
+const FORMAT = 2;
 
 // On GitHub Actions, "::notice::" / "::error::" lines show up as annotations on the run.
 const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
@@ -128,9 +131,10 @@ async function main() {
   const now = Date.now();
   const done = sessions.filter((s) => KEEP.test(s.session_name) && Date.parse(s.date_end) + 30 * 60000 < now);
   const meetings = [...new Set(done.map((s) => s.meeting_key))].slice(-MEETINGS_BACK);
-  const todo = done.filter((s) => meetings.includes(s.meeting_key) && !have.has(s.session_key))
+  const stale = new Set(index.sessions.filter((e) => (e.v ?? 1) < FORMAT).map((e) => e.key));
+  const todo = done.filter((s) => (meetings.includes(s.meeting_key) && !have.has(s.session_key)) || stale.has(s.session_key))
     .sort((a, b) => Date.parse(b.date_start) - Date.parse(a.date_start));
-  log(`${todo.length} session(s) to archive`);
+  log(`${todo.length} session(s) to archive (${stale.size} rebuilt in the newer format)`);
 
   let added = 0;
   for (const s of todo) {
@@ -144,10 +148,20 @@ async function main() {
       writeFileSync(`${OUT}/${file}`, gz);
       const isRace = /Race/i.test(s.session_type);
       const rating = rate(lines, isRace);
-      index.sessions.push({
+      const old = index.sessions.find((e) => e.key === s.session_key);
+      const fresh = {
         key: s.session_key, year: YEAR, meeting: s.country_name, location: s.location, circuit: s.circuit_short_name,
-        name: s.session_name, type: s.session_type, startUtc: s.date_start, file, sizeKb: Math.round(gz.length / 1024), ...rating,
-      });
+        name: s.session_name, type: s.session_type, startUtc: s.date_start, file, sizeKb: Math.round(gz.length / 1024), ...rating, v: FORMAT,
+      };
+      if (old) {
+        // rebuilding an older file: keep its telemetry, redo its incidents
+        Object.assign(old, fresh);
+        await saveIncidents(old, lines);
+        notice(`Rebuilt ${s.country_name} ${s.session_name}`);
+        await pause(WAIT);
+        continue;
+      }
+      index.sessions.push(fresh);
       added++;
 
       // circuit outline (once per circuit) and everyone's fastest-lap telemetry
@@ -177,6 +191,28 @@ async function main() {
     }
   }
   index.sessions.sort((a, b) => (b.startUtc ?? "").localeCompare(a.startUtc ?? ""));
+
+  // circuits still missing a track map (the outline request can fail when OpenF1 is busy)
+  let tries = 0;
+  for (const entry of index.sessions) {
+    const trackFile = `${TRACKS}/${slug(entry.circuit)}.json`;
+    if (existsSync(trackFile) || tries >= 8) continue;
+    tries++;
+    try {
+      const laps = await openf1(`laps?session_key=${entry.key}`);
+      await pause(WAIT);
+      const best = fastestLaps(laps).sort((a, b) => a.seconds - b.seconds);
+      for (const lap of best.slice(0, 3)) {
+        const outline = await trackOutline(entry.key, lap);
+        await pause(WAIT);
+        if (outline) { writeFileSync(trackFile, JSON.stringify({ circuit: entry.circuit, points: outline })); log(`Track map for ${entry.circuit}`); break; }
+      }
+    } catch (e) {
+      if (/401/.test(e.message)) break;
+      log(`  no track map for ${entry.circuit}: ${e.message}`);
+    }
+  }
+
   // older archived sessions that don't have incident data yet: work it out from the saved replay
   for (const entry of index.sessions) {
     if (existsSync(`${INCIDENTS}/${entry.key}.json`) || !existsSync(`${OUT}/${entry.file}`)) continue;

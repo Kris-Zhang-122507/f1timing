@@ -31,7 +31,8 @@ const iso = (ms) => new Date(ms).toISOString();
 
 function trackFromMessage(msg) {
   const t = String(msg ?? "").toUpperCase();
-  if (/RED FLAG/.test(t)) return "5";
+  if (/CHEQUERED/.test(t)) return null; // "chequeRED FLAG" is not a red flag
+  if (/\bRED FLAG/.test(t)) return "5";
   if (/VIRTUAL SAFETY CAR ENDING|VSC ENDING/.test(t)) return "7";
   if (/VIRTUAL SAFETY CAR DEPLOYED|VSC DEPLOYED/.test(t)) return "6";
   if (/SAFETY CAR DEPLOYED/.test(t)) return "4";
@@ -88,7 +89,8 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
 
   // --- laps: sector times as they're completed, then the lap time at the line ---
   const bestLap = {}, bestSec = {}, overallSec = [Infinity, Infinity, Infinity];
-  let overallLap = Infinity, leaderLap = 0;
+  let overallLap = Infinity;
+  const firstEnd = {}; // lap number -> when the first car finished it
   const lapsSorted = [...laps].filter((l) => l.date_start).sort((a, b) => Date.parse(a.date_start) - Date.parse(b.date_start));
   for (const l of lapsSorted) {
     const n = l.driver_number, t0 = Date.parse(l.date_start);
@@ -121,14 +123,14 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
       if (l.st_speed) speeds.ST = { Value: String(l.st_speed) };
       if (Object.keys(speeds).length) line.Speeds = speeds;
       at(tEnd, "TimingData", { Lines: { [n]: line } });
-      if (isRace && l.lap_number >= leaderLap) {
-        leaderLap = l.lap_number;
-        at(tEnd + 1, "LapCount", { CurrentLap: Math.min(totalLaps, l.lap_number + 1), TotalLaps: totalLaps });
-      }
+      if (isRace) firstEnd[l.lap_number] = Math.min(firstEnd[l.lap_number] ?? Infinity, tEnd);
     } else if (l.lap_number) {
       at(t0, "TimingData", { Lines: { [n]: { NumberOfLaps: l.lap_number - 1 } } });
     }
   }
+  // lap counter: goes up when the first car completes each lap (never backwards)
+  for (const [lap, t] of Object.entries(firstEnd)) at(t + 1, "LapCount", { CurrentLap: Math.min(totalLaps, Number(lap) + 1), TotalLaps: totalLaps });
+
   // session bests for the Compare tab / timing insights (sent once at the end; good enough for replays)
   const stats = {};
   for (const [n, s] of Object.entries(bestSec)) stats[n] = { BestSectors: s.map((x) => ({ Value: x != null ? x.toFixed(3) : "" })), PersonalBestLapTime: { Value: lapStr(bestLap[n]) } };

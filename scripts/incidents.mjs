@@ -33,11 +33,14 @@ export function extractIncidents(lines) {
   for (const i of out) {
     if (i.kind === "stopped" && caution.some((t) => t >= i.ms - 60000 && t <= i.ms + 120000)) { i.kind = "crash"; i.points = 8; i.likely = true; }
   }
-  // the same car + kind reported several times within a few minutes counts once
+  // The same incident gets reported several times ("NOTED", "UNDER INVESTIGATION", the
+  // stewards' decision…) — count it once per car: same car + kind + turn, or within 5 minutes.
   const seen = [];
+  const turnOf = (msg) => String(msg ?? "").toUpperCase().match(/TURN (\d+)/)?.[1] ?? null;
   const unique = out.sort((a, b) => a.ms - b.ms).filter((i) => {
-    if (seen.some((s) => s.n === i.n && s.kind === i.kind && i.ms - s.ms < 5 * 60000)) return false;
-    seen.push(i);
+    const turn = turnOf(i.message);
+    if (seen.some((s) => s.n === i.n && s.kind === i.kind && (i.ms - s.ms < 5 * 60000 || (turn && s.turn === turn)))) return false;
+    seen.push({ ...i, turn });
     return true;
   });
   return unique.map((i) => {
