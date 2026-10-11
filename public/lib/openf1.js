@@ -141,6 +141,11 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
   for (const [n, s] of Object.entries(bestSec)) stats[n] = { BestSectors: s.map((x) => ({ Value: x != null ? x.toFixed(3) : "" })), PersonalBestLapTime: { Value: lapStr(bestLap[n]) } };
   at(end, "TimingStats", { Lines: stats });
 
+  // when each driver left the pits, stop by stop (to time the tyre change)
+  const pitOutAt = {};
+  for (const p of [...pits].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))) {
+    (pitOutAt[p.driver_number] ??= []).push(Date.parse(p.date) + (p.lane_duration ?? p.pit_duration ?? 22) * 1000);
+  }
   // --- tyres: each stint appears when it starts, and ages lap by lap ---
   const lapEnd = {};
   for (const l of lapsSorted) if (l.lap_duration) (lapEnd[l.driver_number] ??= {})[l.lap_number] = Date.parse(l.date_start) + l.lap_duration * 1000;
@@ -148,11 +153,14 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
     const n = s.driver_number, k = (s.stint_number ?? 1) - 1;
     const startAge = s.tyre_age_at_start ?? 0;
     const firstLap = s.lap_start ?? 1;
-    const t = k === 0 ? start - 30000 : (lapEnd[n]?.[firstLap - 1] ?? start);
+    // a new set appears when the car leaves the pits (OpenF1's stint lap numbers can be a lap or two early)
+    const pitOut = pitOutAt[n]?.[k - 1];
+    const t = k === 0 ? start - 30000 : Math.max(lapEnd[n]?.[firstLap - 1] ?? start, pitOut ?? 0);
     at(t, "TimingAppData", { Lines: { [n]: { Stints: { [k]: { Compound: s.compound ?? "UNKNOWN", New: startAge === 0 ? "true" : "false", StartLaps: startAge, TotalLaps: startAge } } } } });
+    let done = 0; // laps completed on this set since it went on
     for (let lap = firstLap; lap <= (s.lap_end ?? firstLap); lap++) {
       const te = lapEnd[n]?.[lap];
-      if (te) at(te + 2, "TimingAppData", { Lines: { [n]: { Stints: { [k]: { TotalLaps: startAge + (lap - firstLap + 1) } } } } });
+      if (te && te + 2 > t) at(te + 2, "TimingAppData", { Lines: { [n]: { Stints: { [k]: { TotalLaps: startAge + ++done } } } } });
     }
   }
 

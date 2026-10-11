@@ -6,7 +6,9 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv4chrg4">
+<link rel="stylesheet" href="vendor/gridstack/gridstack.min.css">
+<link rel="stylesheet" href="vendor/gridstack/gridstack-24.css">
+<link rel="stylesheet" href="style.css?v=mv4efh2u">
 </head>
 <body>
 <div class="wrap">
@@ -62,9 +64,7 @@
   </section>
 
   <nav class="tabs" id="tabs" aria-label="Views">
-    <button data-tab="overview" class="on">Overview</button>
-    <button data-tab="circle">Circle of doom</button>
-    <button data-tab="tyres">Tyres</button>
+    <button data-tab="overview" class="on">Live</button>
     <button data-tab="strategy">Strategy</button>
     <button data-tab="compare">Compare</button>
     <button data-tab="rewind">Rewind</button>
@@ -74,30 +74,14 @@
     <button data-tab="technical">Technical</button>
     <button data-tab="news">News</button>
     <button data-tab="schedule">Schedule</button>
+    <div class="spacer"></div>
+    <div class="dash-tools" id="dashTools">
+      <details class="menu" id="addMenu"><summary>Add panel</summary><div class="menu-list" id="addList"></div></details>
+      <details class="menu" id="layoutMenu"><summary>Layout</summary><div class="menu-list" id="layoutList"></div></details>
+      <button class="tool" id="lockBtn" aria-pressed="false" title="Stop panels moving by accident">Lock</button>
+      <button class="tool" id="fullBtn" title="Full screen">Full screen</button>
+    </div>
   </nav>
-
-  <section class="card" id="tab-circle" hidden>
-    <div class="card-head">
-      <h2>Circle of doom</h2>
-      <div class="circle-tools">
-        <div class="filters"><button id="viewCircle" class="on">Circle</button><button id="viewTrack">Track map</button><button id="viewBoth">Both</button></div>
-        <span class="muted small" id="circleSel">Tap a car to make it the reference</span>
-        <button class="btn" id="circleClear" hidden>Clear</button>
-        <label class="muted small">Pit stop costs <input type="number" id="pitLoss" min="5" max="60" step="1" value="22"> s <span id="pitSrc"></span></label> <button class="btn" id="pitReset" hidden>Use measured</button>
-      </div>
-    </div>
-    <div class="circle-pair" id="circlePair">
-      <div id="circle" class="circle-wrap"></div>
-      <div class="splitter" id="splitPair" role="separator" aria-orientation="vertical" aria-label="Drag to resize the circle and track map" tabindex="0" title="Drag to resize · double-click to reset"></div>
-      <div id="trackMap" class="circle-wrap" hidden></div>
-    </div>
-    <p class="muted small">Cars are placed by their timing gap behind the leader. Red arcs = within a second. The shaded band shows where the selected car would rejoin if it pitted now — it shrinks automatically under a safety car or VSC, when a stop costs much less.</p>
-  </section>
-
-  <section class="card" id="tab-tyres" hidden>
-    <h2>Tyre strategy</h2>
-    <div id="tyres"></div>
-  </section>
 
   <div id="tab-strategy" hidden></div>
   <div id="tab-compare" class="stack" hidden></div>
@@ -112,19 +96,21 @@
     <div id="schedBox" class="stack"></div>
   </div>
 
-  <main class="grid" id="tab-overview">
-    <div class="stack main-col">
-    <section class="card table-card">
-      <div class="card-head">
+  <div class="grid-stack" id="tab-overview"></div>
+
+  <!-- Panels for the Live dashboard. dash.js moves them into the grid; ones you close wait here. -->
+  <div id="widgetPool" hidden>
+    <section class="w" id="w-timing" data-title="Timing">
+      <header class="w-head">
         <h2>Timing <span class="chip amber" id="qualiBadge" hidden></span></h2>
         <div class="legend">
-          <span><i class="sw p"></i>Fastest overall</span>
+          <span><i class="sw p"></i>Fastest</span>
           <span><i class="sw g"></i>Personal best</span>
           <span><i class="sw y"></i>Slower</span>
           <span><i class="sw b"></i>Pit lane</span>
         </div>
-      </div>
-      <div class="scroll">
+      </header>
+      <div class="w-body">
         <table class="timing">
           <thead>
             <tr>
@@ -135,54 +121,91 @@
           </thead>
           <tbody id="rows"><tr><td colspan="13" class="muted empty">No timing yet — data starts flowing shortly before the session.</td></tr></tbody>
         </table>
+        <div class="insights" id="insights"></div>
       </div>
-      <div class="insights" id="insights"></div>
     </section>
-    <div class="pinbar" id="pinbar"></div>
-    <div class="stack" id="ovPinned"></div>
-    </div>
-    <div class="splitter" id="splitSide" role="separator" aria-orientation="vertical" aria-label="Drag to resize the side column" tabindex="0" title="Drag to resize · double-click to reset"></div>
 
-    <aside class="side">
-      <section class="card">
-        <h2>Battles</h2>
-        <div id="battles" class="battles"><div class="muted small">Nobody within a second of the car ahead right now.</div></div>
-      </section>
-      <section class="card">
-        <div class="card-head">
-          <h2>What just happened</h2>
-          <div class="filters" id="explain"><button data-mode="simple" class="on">Explain it simply</button><button data-mode="facts">Just the facts</button></div>
+    <section class="w" id="w-track" data-title="Track map">
+      <header class="w-head"><h2>Track map</h2><span class="muted small" id="trackNote"></span></header>
+      <div class="w-body fill"><div id="trackMap" class="circle-wrap"></div></div>
+    </section>
+
+    <section class="w" id="w-circle" data-title="Circle of doom">
+      <header class="w-head">
+        <h2>Circle of doom</h2>
+        <div class="circle-tools">
+          <span class="muted small" id="circleSel">Tap a car to see where it would rejoin after a stop</span>
+          <button class="btn" id="circleClear" hidden>Clear</button>
+          <label class="muted small">Pit stop <input type="number" id="pitLoss" min="5" max="60" step="1" value="22"> s <span id="pitSrc"></span></label>
+          <button class="btn" id="pitReset" hidden>Use measured</button>
         </div>
-        <div id="story" class="feed"><div class="muted small">Pit stops, overtakes, fastest laps and safety cars will show up here.</div></div>
-      </section>
-      <section class="card">
-        <div class="card-head"><h2>Rain watch</h2><span class="muted small">next 2 hours at the circuit</span></div>
-        <div id="weatherBox"><div class="muted small">Loading forecast…</div></div>
-      </section>
-      <section class="card">
-        <div class="card-head">
-          <h2>Team radio</h2>
-          <label class="muted small autoplay"><input type="checkbox" id="radioAuto"> Auto-play new clips</label>
+      </header>
+      <div class="w-body fill"><div id="circle" class="circle-wrap"></div></div>
+    </section>
+
+    <section class="w" id="w-battles" data-title="Battles">
+      <header class="w-head"><h2>Battles</h2></header>
+      <div class="w-body"><div id="battles" class="battles"><div class="muted small">Nobody within a second of the car ahead right now.</div></div></div>
+    </section>
+
+    <section class="w" id="w-story" data-title="What just happened">
+      <header class="w-head">
+        <h2>What just happened</h2>
+        <div class="filters" id="explain"><button data-mode="simple" class="on">Explain it simply</button><button data-mode="facts">Just the facts</button></div>
+      </header>
+      <div class="w-body"><div id="story" class="feed"><div class="muted small">Pit stops, overtakes, fastest laps and safety cars will show up here.</div></div></div>
+    </section>
+
+    <section class="w" id="w-rcm" data-title="Race control">
+      <header class="w-head">
+        <h2>Race control</h2>
+        <div class="filters" id="rcFilters">
+          <button data-f="all" class="on">All</button>
+          <button data-f="flag">Flags</button>
+          <button data-f="penalty">Penalties</button>
+          <button data-f="investigation">Investigations</button>
+          <button data-f="limits">Track limits</button>
         </div>
-        <div id="radio" class="feed radio-feed"><div class="muted small">Clips appear here as F1 publishes them.</div></div>
-      </section>
-      <section class="card">
-        <div class="card-head">
-          <h2>Race control</h2>
-          <div class="filters" id="rcFilters">
-            <button data-f="all" class="on">All</button>
-            <button data-f="flag">Flags</button>
-            <button data-f="penalty">Penalties</button>
-            <button data-f="investigation">Investigations</button>
-            <button data-f="limits">Track limits</button>
-          </div>
-        </div>
-        <div id="rcm" class="feed"></div>
-      </section>
-    </aside>
-  </main>
+      </header>
+      <div class="w-body"><div id="rcm" class="feed"></div></div>
+    </section>
+
+    <section class="w" id="w-radio" data-title="Team radio">
+      <header class="w-head">
+        <h2>Team radio</h2>
+        <label class="muted small autoplay"><input type="checkbox" id="radioAuto"> Auto-play new clips</label>
+      </header>
+      <div class="w-body"><div id="radio" class="feed radio-feed"><div class="muted small">Clips appear here as F1 publishes them.</div></div></div>
+    </section>
+
+    <section class="w" id="w-weather" data-title="Rain watch">
+      <header class="w-head"><h2>Rain watch</h2><span class="muted small">next 2 hours at the circuit</span></header>
+      <div class="w-body"><div id="weatherBox"><div class="muted small">Loading forecast…</div></div></div>
+    </section>
+
+    <section class="w" id="w-tyres" data-title="Tyres">
+      <header class="w-head"><h2>Tyre strategy</h2></header>
+      <div class="w-body"><div id="tyres"></div></div>
+    </section>
+
+    <section class="w" id="w-strategy" data-title="Strategy" data-page="strategy">
+      <header class="w-head"><h2>Strategy</h2></header>
+      <div class="w-body" data-slot="strategy"></div>
+    </section>
+
+    <section class="w" id="w-driver" data-title="My driver" data-page="driver">
+      <header class="w-head"><h2>My driver</h2></header>
+      <div class="w-body" data-slot="driver"></div>
+    </section>
+
+    <section class="w" id="w-rewind" data-title="Rewind" data-page="rewind">
+      <header class="w-head"><h2>Rewind</h2></header>
+      <div class="w-body" data-slot="rewind"></div>
+    </section>
+  </div>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv4chrg4"></script>
+<script src="vendor/gridstack/gridstack-all.js"></script>
+<script type="module" src="app.js?v=mv4efh2u"></script>
 </body>
 </html>

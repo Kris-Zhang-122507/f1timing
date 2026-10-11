@@ -57,7 +57,8 @@ const KEEP = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
 // Bump when the replay builder changes in a way worth rebuilding old files for.
 // 2: lap counter never goes backwards; chequered flag no longer read as a red flag.
 // 3: official overtakes, starting grid, final result, stationary pit stop times, RPM telemetry.
-const FORMAT = 3;
+// 4: new tyres appear when the car leaves the pits, not a lap or two early.
+const FORMAT = 4;
 
 // On GitHub Actions, "::notice::" / "::error::" lines show up as annotations on the run.
 const notice = (m) => console.log(process.env.GITHUB_ACTIONS ? `::notice::${m}` : m);
