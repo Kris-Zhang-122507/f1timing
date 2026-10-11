@@ -121,8 +121,9 @@ export class Race {
 
   add(type, head, body = "") {
     // skip duplicates of a recent event (the feed sometimes repeats itself)
-    if (this.story.slice(-5).some((e) => e.head === head && Date.now() - e.t < 60000)) return;
-    this.story.push({ type, head, body, lap: this.lap, t: Date.now() });
+    const t = this.now();
+    if (this.story.slice(-5).some((e) => e.head === head && t - e.t < 60000)) return;
+    this.story.push({ type, head, body, lap: this.lap, t });
     if (this.story.length > 80) this.story.shift();
   }
 

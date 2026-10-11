@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # the archive job pushes with the built-in token, which doesn't trigger "push" runs
+  workflow_run:
+    workflows: ["Archive sessions"]
+    types: [completed]
 
 permissions:
   contents: read
