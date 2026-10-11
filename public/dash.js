@@ -12,9 +12,10 @@ const PRESETS = {
     { id: "rcm", x: 13, y: 18, w: 6, h: 16 },
     { id: "story", x: 19, y: 18, w: 5, h: 16 },
     { id: "circle", x: 0, y: 34, w: 9, h: 22 },
-    { id: "battles", x: 9, y: 34, w: 5, h: 22 },
-    { id: "radio", x: 14, y: 34, w: 5, h: 22 },
-    { id: "weather", x: 19, y: 34, w: 5, h: 10 },
+    { id: "car", x: 9, y: 34, w: 6, h: 22 },
+    { id: "battles", x: 15, y: 34, w: 4, h: 22 },
+    { id: "radio", x: 19, y: 34, w: 5, h: 12 },
+    { id: "weather", x: 19, y: 46, w: 5, h: 10 },
   ] },
   quali: { name: "Qualifying", panels: [
     { id: "timing", x: 0, y: 0, w: 15, h: 36 },
@@ -28,6 +29,7 @@ const PRESETS = {
     { id: "timing", x: 0, y: 0, w: 12, h: 34 },
     { id: "circle", x: 12, y: 0, w: 12, h: 34 },
     { id: "tyres", x: 0, y: 34, w: 12, h: 26 },
+    { id: "car", x: 0, y: 60, w: 8, h: 20 },
     { id: "strategy", x: 12, y: 34, w: 12, h: 26 },
   ] },
   maps: { name: "Track + circle", panels: [
@@ -38,6 +40,8 @@ const PRESETS = {
   ] },
 };
 const KEY = "undercut.layout.v1";
+const SAVED = "undercut.layouts"; // your named layouts: { name: [{ id, x, y, w, h }] }
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 export class Dashboard {
   constructor({ onChange }) {
@@ -151,11 +155,37 @@ export class Dashboard {
     $("addList").innerHTML = closed.length
       ? closed.map((p) => `<button type="button" data-add="${p.id}">${p.title}</button>`).join("")
       : `<div class="muted small menu-note">Every panel is already on the page.</div>`;
-    $("layoutList").innerHTML = Object.entries(PRESETS).map(([k, v]) => `<button type="button" data-preset="${k}">${v.name}</button>`).join("")
-      + `<div class="menu-note muted small">Drag a panel's title bar to move it, any edge to resize it. Your layout is saved in this browser.</div>`;
+    const mine = this.savedLayouts();
+    const names = Object.keys(mine);
+    $("layoutList").innerHTML = `<form class="menu-save" id="saveLayout">
+        <label class="sr" for="layoutName">Name for this layout</label>
+        <input id="layoutName" maxlength="30" placeholder="Name this layout" autocomplete="off">
+        <button type="submit">Save</button>
+      </form>`
+      + (names.length ? `<div class="menu-label muted small">Your layouts</div>${names.map((n) => `<div class="menu-row"><button type="button" data-mine="${esc(n)}">${esc(n)}</button><button type="button" class="menu-x" data-del="${esc(n)}" aria-label="Delete ${esc(n)}" title="Delete">×</button></div>`).join("")}` : "")
+      + `<div class="menu-label muted small">Starting points</div>`
+      + Object.entries(PRESETS).map(([k, v]) => `<button type="button" data-preset="${k}">${v.name}</button>`).join("")
+      + `<div class="menu-note muted small">Drag a title bar to move a panel, any edge to resize it. Changes are kept automatically in this browser; saving a layout lets you switch back to it later.</div>`;
+  }
+
+  savedLayouts() {
+    try { return JSON.parse(localStorage.getItem(SAVED)) || {}; } catch { return {}; }
+  }
+  current() {
+    return this.panels.filter((p) => p.item).map((p) => { const n = p.item.gridstackNode; return { id: p.id, x: n.x, y: n.y, w: n.w, h: n.h }; });
   }
 
   wireControls() {
+    $("layoutList").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = $("layoutName").value.trim();
+      if (!name) { $("layoutName").focus(); return; }
+      const all = this.savedLayouts();
+      all[name] = this.current();
+      try { localStorage.setItem(SAVED, JSON.stringify(all)); } catch {}
+      this.buildMenus();
+      $("layoutMenu").open = true;
+    });
     $("addList").addEventListener("click", (e) => {
       const b = e.target.closest("[data-add]");
       if (!b) return;
@@ -163,6 +193,16 @@ export class Dashboard {
       $("addMenu").open = false;
     });
     $("layoutList").addEventListener("click", (e) => {
+      const del = e.target.closest("[data-del]");
+      if (del) {
+        const all = this.savedLayouts();
+        delete all[del.dataset.del];
+        try { localStorage.setItem(SAVED, JSON.stringify(all)); } catch {}
+        this.buildMenus();
+        return;
+      }
+      const mine = e.target.closest("[data-mine]");
+      if (mine) { this.apply(this.savedLayouts()[mine.dataset.mine] ?? []); $("layoutMenu").open = false; return; }
       const b = e.target.closest("[data-preset]");
       if (!b) return;
       this.apply(PRESETS[b.dataset.preset].panels);

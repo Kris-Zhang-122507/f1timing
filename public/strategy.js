@@ -1,6 +1,6 @@
 // Strategy tab: predicted finish, pit predictor, battle forecast and the pit stop log.
 // Everything here is a simple, explainable estimate — not a crystal ball.
-import { computeModel, lossFor } from "./circle.js?v=mv4ejxsf";
+import { computeModel, lossFor } from "./circle.js?v=mv4eq68g";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const TYRE = { S: "#FF5A5A", M: "#FFD23F", H: "#E8EAF0", I: "#3DDC97", W: "#4A90E2" };

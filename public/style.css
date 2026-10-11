@@ -433,3 +433,29 @@ body[data-flag="red"]::before { background: #FF4D4D; }
 ::-webkit-scrollbar-thumb:hover { background: #4A5160; background-clip: padding-box; }
 ::-webkit-scrollbar-button { display: none; }
 html { color-scheme: dark; }
+
+/* car telemetry panel */
+.tele { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.tele-pick select { background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; min-height: 28px; font: inherit; margin-left: 6px; }
+.tele-main { display: flex; align-items: flex-end; gap: 24px; }
+.tele-speed { display: flex; align-items: baseline; gap: 6px; }
+.tele-speed .mono { font-size: 54px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.tele-gear { display: flex; flex-direction: column; align-items: center; }
+.tele-gear .mono { font-size: 40px; font-weight: 600; line-height: 1; color: var(--accent); }
+.tele-bars { display: grid; gap: 6px; }
+.tele-bars > div { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; }
+.tbar { height: 10px; background: var(--card2); border-radius: 3px; overflow: hidden; }
+.tbar i { display: block; height: 100%; width: 0; transition: width .1s linear; }
+.tbar .thr { background: var(--g); } .tbar .brk { background: #FF4D4D; } .tbar .rpm { background: var(--b); }
+.tele-trace { width: 100%; height: 60px; flex: 1 1 auto; min-height: 40px; background: #0F1218; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .tbar i { transition: none; } }
+.menu-list { min-width: 260px; }
+.menu-save { display: flex; gap: 4px; padding: 4px; }
+.menu-save input { flex: 1 1 auto; min-width: 0; min-height: 30px; padding: 0 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 13px; }
+.menu-save input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.menu-save button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 4px; background: var(--accent); color: #1A1204; font: 600 13px "Barlow", sans-serif; cursor: pointer; }
+.menu-label { padding: 8px 10px 2px; }
+.menu-row { display: flex; }
+.menu-row > button:first-child { flex: 1 1 auto; }
+.menu-list .menu-x { flex: 0 0 auto; width: 32px; text-align: center; color: var(--faint); }
+.menu-list .menu-x:hover { color: #FEB2B2; background: #2A1414; }

@@ -1,18 +1,19 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4ejxsf";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4ejxsf";
-import { CircleView } from "./circle.js?v=mv4ejxsf";
-import { renderTyres } from "./tyres.js?v=mv4ejxsf";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4ejxsf";
-import { renderCompare } from "./compare.js?v=mv4ejxsf";
-import { renderRewind } from "./rewind.js?v=mv4ejxsf";
-import { renderDriver } from "./driver.js?v=mv4ejxsf";
-import { Player, parseRecording } from "./player.js?v=mv4ejxsf";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4ejxsf";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4ejxsf";
-import { Dashboard } from "./dash.js?v=mv4ejxsf";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4ejxsf";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4ejxsf";
+import { LiveState } from "./lib/state.js?v=mv4eq68g";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4eq68g";
+import { CircleView } from "./circle.js?v=mv4eq68g";
+import { renderTyres } from "./tyres.js?v=mv4eq68g";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4eq68g";
+import { renderCompare } from "./compare.js?v=mv4eq68g";
+import { renderRewind } from "./rewind.js?v=mv4eq68g";
+import { renderDriver } from "./driver.js?v=mv4eq68g";
+import { Player, parseRecording } from "./player.js?v=mv4eq68g";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4eq68g";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4eq68g";
+import { Dashboard } from "./dash.js?v=mv4eq68g";
+import { CarTelemetry } from "./telemetry.js?v=mv4eq68g";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4eq68g";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4eq68g";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -900,6 +901,26 @@ const dash = new Dashboard({
   },
 });
 dash.wireControls();
+
+// Car telemetry panel (speed, gear, throttle, brake, RPM) — follows "My driver"
+const carTele = new CarTelemetry($("carTele"));
+let lastTele = 0;
+(function teleLoop(ts) {
+  requestAnimationFrame(teleLoop);
+  if (ts - lastTele < 110 || tab !== "overview" || !dashSet.has("car") || !view) return;
+  if (document.activeElement?.id === "teleSel") return;
+  lastTele = ts;
+  const drivers = view.rows.filter((r) => r.pos < 99).map((r) => ({ n: r.n, tla: r.tla, name: r.name, colour: r.colour, speed: r.speed }));
+  const replay = view.mode === "replay";
+  carTele.render({ drivers, sel: dvSel, session: replay ? replayKey : null, t: replay ? player?.now : Date.now(), live: !replay });
+})(0);
+$("carTele").addEventListener("change", (e) => {
+  if (e.target.id !== "teleSel") return;
+  dvSel = e.target.value;
+  try { localStorage.setItem("undercut.driver", dvSel); } catch {}
+  lastSlow = 0;
+  e.target.blur();
+});
 $("circleClear").addEventListener("click", () => { circleSel = null; if (view) updateCircle(view); });
 $("pitLoss").addEventListener("input", (e) => {
   const n = Number(e.target.value), slug = pitProfile(view).slug;
