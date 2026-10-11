@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4c0ua3";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4c0ua3";
-import { CircleView } from "./circle.js?v=mv4c0ua3";
-import { renderTyres } from "./tyres.js?v=mv4c0ua3";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4c0ua3";
-import { renderCompare } from "./compare.js?v=mv4c0ua3";
-import { renderRewind } from "./rewind.js?v=mv4c0ua3";
-import { renderDriver } from "./driver.js?v=mv4c0ua3";
-import { Player, parseRecording } from "./player.js?v=mv4c0ua3";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4c0ua3";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4c0ua3";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4c0ua3";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4c0ua3";
+import { LiveState } from "./lib/state.js?v=mv4chrg4";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4chrg4";
+import { CircleView } from "./circle.js?v=mv4chrg4";
+import { renderTyres } from "./tyres.js?v=mv4chrg4";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4chrg4";
+import { renderCompare } from "./compare.js?v=mv4chrg4";
+import { renderRewind } from "./rewind.js?v=mv4chrg4";
+import { renderDriver } from "./driver.js?v=mv4chrg4";
+import { Player, parseRecording } from "./player.js?v=mv4chrg4";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4chrg4";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4chrg4";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4chrg4";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4chrg4";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -957,3 +957,47 @@ setInterval(() => {
 }, 1000);
 
 if (standalone) connectDirect(); else connect();
+
+// ---------- resizable areas (drag the thin handles; double-click resets; arrow keys work too) ----------
+function makeSplitter(handle, { get, set, reset, key }) {
+  try { const saved = JSON.parse(localStorage.getItem(key)); if (saved != null) set(saved); } catch {}
+  const save = () => { try { localStorage.setItem(key, JSON.stringify(get())); } catch {} };
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("dragging"); document.body.classList.add("resizing");
+    const startX = e.clientX, start = get();
+    const move = (ev) => set(start, ev.clientX - startX);
+    const up = () => {
+      handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up);
+      handle.classList.remove("dragging"); document.body.classList.remove("resizing"); save();
+    };
+    handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", up);
+  });
+  handle.addEventListener("dblclick", () => { reset(); try { localStorage.removeItem(key); } catch {} });
+  handle.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault(); set(get(), e.key === "ArrowLeft" ? -24 : 24); save();
+  });
+}
+// side column: dragging left makes it wider
+let sideW = 400;
+makeSplitter($("splitSide"), {
+  key: "undercut.sideW",
+  get: () => sideW,
+  set: (base, dx = 0) => { sideW = Math.round(Math.max(260, Math.min(window.innerWidth * 0.6, base - dx))); document.documentElement.style.setProperty("--side-w", `${sideW}px`); },
+  reset: () => { sideW = 400; document.documentElement.style.removeProperty("--side-w"); },
+});
+// circle vs track map in "Both" view: share of the width given to the circle
+let pairL = 0.5;
+makeSplitter($("splitPair"), {
+  key: "undercut.pairL",
+  get: () => pairL,
+  set: (base, dx = 0) => {
+    const w = $("circlePair").getBoundingClientRect().width || 1000;
+    pairL = Math.max(0.2, Math.min(0.8, base + dx / w));
+    $("circlePair").style.setProperty("--pair-l", `${pairL}fr`);
+    $("circlePair").style.setProperty("--pair-r", `${1 - pairL}fr`);
+  },
+  reset: () => { pairL = 0.5; $("circlePair").style.removeProperty("--pair-l"); $("circlePair").style.removeProperty("--pair-r"); },
+});

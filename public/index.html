@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv4c0ua3">
+<link rel="stylesheet" href="style.css?v=mv4chrg4">
 </head>
 <body>
 <div class="wrap">
@@ -88,6 +88,7 @@
     </div>
     <div class="circle-pair" id="circlePair">
       <div id="circle" class="circle-wrap"></div>
+      <div class="splitter" id="splitPair" role="separator" aria-orientation="vertical" aria-label="Drag to resize the circle and track map" tabindex="0" title="Drag to resize · double-click to reset"></div>
       <div id="trackMap" class="circle-wrap" hidden></div>
     </div>
     <p class="muted small">Cars are placed by their timing gap behind the leader. Red arcs = within a second. The shaded band shows where the selected car would rejoin if it pitted now — it shrinks automatically under a safety car or VSC, when a stop costs much less.</p>
@@ -140,6 +141,7 @@
     <div class="pinbar" id="pinbar"></div>
     <div class="stack" id="ovPinned"></div>
     </div>
+    <div class="splitter" id="splitSide" role="separator" aria-orientation="vertical" aria-label="Drag to resize the side column" tabindex="0" title="Drag to resize · double-click to reset"></div>
 
     <aside class="side">
       <section class="card">
@@ -181,6 +183,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv4c0ua3"></script>
+<script type="module" src="app.js?v=mv4chrg4"></script>
 </body>
 </html>
