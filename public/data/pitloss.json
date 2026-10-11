@@ -43,6 +43,34 @@
     "2026 Race"
    ]
   },
+  "madring": {
+   "circuit": "Madring",
+   "green": 25.5,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 13,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
+  "monza": {
+   "circuit": "Monza",
+   "green": 33.5,
+   "sc": null,
+   "vsc": 16.4,
+   "samples": {
+    "green": 2,
+    "sc": 0,
+    "vsc": 3
+   },
+   "sessions": [
+    "2026 Race"
+   ]
+  },
   "zandvoort": {
    "circuit": "Zandvoort",
    "green": 18.7,
@@ -88,11 +116,11 @@
   },
   "silverstone": {
    "circuit": "Silverstone",
-   "green": 21.1,
+   "green": 21.2,
    "sc": null,
    "vsc": null,
    "samples": {
-    "green": 21,
+    "green": 22,
     "sc": 0,
     "vsc": 0
    },
@@ -160,5 +188,5 @@
   }
  },
  "scRatio": 0.55,
- "vscRatio": 0.67
+ "vscRatio": 0.66
 }
