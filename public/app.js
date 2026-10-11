@@ -1,17 +1,17 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4buon5";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4buon5";
-import { CircleView } from "./circle.js?v=mv4buon5";
-import { renderTyres } from "./tyres.js?v=mv4buon5";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4buon5";
-import { renderCompare } from "./compare.js?v=mv4buon5";
-import { renderRewind } from "./rewind.js?v=mv4buon5";
-import { renderDriver } from "./driver.js?v=mv4buon5";
-import { Player, parseRecording } from "./player.js?v=mv4buon5";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4buon5";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4buon5";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4buon5";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4buon5";
+import { LiveState } from "./lib/state.js?v=mv4c0ua3";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4c0ua3";
+import { CircleView } from "./circle.js?v=mv4c0ua3";
+import { renderTyres } from "./tyres.js?v=mv4c0ua3";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4c0ua3";
+import { renderCompare } from "./compare.js?v=mv4c0ua3";
+import { renderRewind } from "./rewind.js?v=mv4c0ua3";
+import { renderDriver } from "./driver.js?v=mv4c0ua3";
+import { Player, parseRecording } from "./player.js?v=mv4c0ua3";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4c0ua3";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4c0ua3";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4c0ua3";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4c0ua3";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -19,6 +19,12 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 let view = null;
 let rcFilter = "all";
 let tab = "overview";
+// Tabs you've added to the overview page (remembered in this browser)
+const PINNABLE = [["circle", "Circle of doom / track map"], ["tyres", "Tyres"], ["strategy", "Strategy"], ["rewind", "Rewind"], ["driver", "My driver"]];
+let pinned = new Set(["circle"]);
+try { const p = JSON.parse(localStorage.getItem("undercut.pinned")); if (Array.isArray(p)) pinned = new Set(p); } catch {}
+// is this tab's content on screen right now?
+const shows = (t) => tab === t || (tab === "overview" && pinned.has(t));
 let lastStrategy = 0;
 let lastSched = 0;
 let lastStand = 0;
@@ -405,19 +411,19 @@ function render() {
   if (tab === "standings" && Date.now() - lastStand > 5000) drawStandings(v);
   if ((tab === "news" || tab === "technical") && Date.now() - lastNews > 30000) drawNews();
   pitLoss = pitProfile(v);
-  if (tab === "circle") updateCircle(v);
-  if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
-  if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss) + renderPitTable(pitData, pitLoss.slug); }
-  if (["compare", "rewind", "driver"].includes(tab) && Date.now() - lastSlow > 2000) drawSlow(v);
+  if (shows("circle")) updateCircle(v);
+  if (shows("tyres")) $("tyres").innerHTML = renderTyres(v);
+  if (shows("strategy") && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss) + renderPitTable(pitData, pitLoss.slug); }
+  if (["compare", "rewind", "driver"].some(shows) && Date.now() - lastSlow > 2000) drawSlow(v);
 }
 
 // Tabs that don't need twice-a-second redraws. Skipped while you're using a dropdown.
 function drawSlow(v) {
   if (document.activeElement?.tagName === "SELECT") return;
   lastSlow = Date.now();
-  if (tab === "compare") $("tab-compare").innerHTML = renderCompare(v, cmpA, cmpB, telemetryFor(v));
-  if (tab === "rewind") $("tab-rewind").innerHTML = renderRewind(v, rwFocus, rwMark);
-  if (tab === "driver") $("tab-driver").innerHTML = renderDriver(v, dvSel, pitLoss);
+  if (shows("compare")) $("tab-compare").innerHTML = renderCompare(v, cmpA, cmpB, telemetryFor(v));
+  if (shows("rewind")) $("tab-rewind").innerHTML = renderRewind(v, rwFocus, rwMark);
+  if (shows("driver")) $("tab-driver").innerHTML = renderDriver(v, dvSel, pitLoss);
 }
 
 // Clock for the circle: the data's own time, carried forward smoothly between updates.
@@ -433,21 +439,31 @@ const circleView = new CircleView($("circle"), (n) => {
 });
 // Circle or real track map
 let circleMode = "circle";
+try { circleMode = localStorage.getItem("undercut.circleMode") || "circle"; } catch {}
 const trackView = new TrackView($("trackMap"), circleView, (n) => {
   circleSel = circleSel === n ? null : n;
   if (view) updateCircle(view);
 });
 function setCircleMode(mode) {
   circleMode = mode;
+  try { localStorage.setItem("undercut.circleMode", mode); } catch {}
   $("viewCircle").classList.toggle("on", mode === "circle");
   $("viewTrack").classList.toggle("on", mode === "track");
-  $("circle").hidden = mode !== "circle";
-  $("trackMap").hidden = mode !== "track";
-  if (mode === "track" && tab === "circle") trackView.start(); else trackView.stop();
+  $("viewBoth").classList.toggle("on", mode === "both");
+  $("circle").hidden = mode === "track";
+  $("trackMap").hidden = mode === "circle";
+  $("circlePair").classList.toggle("both", mode === "both");
+  syncAnimation();
   if (view) updateCircle(view);
+}
+// the circle keeps computing positions even when only the track map is showing (the map reuses them)
+function syncAnimation() {
+  if (shows("circle")) circleView.start(); else circleView.stop();
+  if (shows("circle") && circleMode !== "circle") trackView.start(); else trackView.stop();
 }
 $("viewCircle").addEventListener("click", () => setCircleMode("circle"));
 $("viewTrack").addEventListener("click", () => setCircleMode("track"));
+$("viewBoth").addEventListener("click", () => setCircleMode("both"));
 
 // Telemetry for Compare: this replay's session if archived, otherwise the latest archived
 // session at the same circuit (so live races show, e.g., qualifying laps).
@@ -476,7 +492,7 @@ function updateCircle(v) {
   if (document.activeElement !== $("pitLoss")) $("pitLoss").value = Math.round(pitLoss.green);
   $("pitSrc").textContent = `(${pitLoss.source})`;
   $("pitReset").hidden = pitLoss.source !== "your number";
-  if (circleMode === "track") {
+  if (circleMode !== "circle") {
     // archived races have every car's real position; otherwise cars are placed by timing
     const gpsKey = v.mode === "replay" && archive?.sessions?.some((s) => s.key === replayKey && s.gps) ? replayKey : null;
     if (gpsKey) loadGps(gpsKey).then((g) => trackView.setGps(g, circleNow));
@@ -871,17 +887,48 @@ $("tabs").addEventListener("click", (e) => {
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule", "standings", "news", "technical"]) $(`tab-${t}`).hidden = t !== tab;
+  showTabs();
   if (tab === "news" || tab === "technical") drawNews();
   if (tab === "standings") { lastStand = 0; drawStandings(view); }
   if (tab === "schedule") { lastSched = 0; drawSchedule(view); }
   if (tab === "replays") renderReplays();
   lastStrategy = 0;
   lastSlow = 0;
-  if (tab === "circle") circleView.start(); else circleView.stop();
-  if (tab === "circle" && circleMode === "track") trackView.start(); else trackView.stop();
+  syncAnimation();
   if (view) render();
 });
+const ALL_TABS = ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule", "standings", "news", "technical"];
+function showTabs() {
+  for (const t of ALL_TABS) $(`tab-${t}`).hidden = !shows(t);
+}
+
+// Adding tabs to the overview: their panel moves onto the main page (below the timing) and the
+// tab button hides, so nothing is drawn twice.
+function placePinned() {
+  const home = $("ovPinned");
+  for (const [t] of PINNABLE) {
+    const el = $(`tab-${t}`), btn = $("tabs").querySelector(`[data-tab="${t}"]`);
+    if (pinned.has(t)) { if (el.parentElement !== home) home.appendChild(el); }
+    else if (el.parentElement === home) $("tab-overview").before(el);
+    btn.hidden = pinned.has(t);
+  }
+  $("pinbar").innerHTML = `<span>On this page:</span>${PINNABLE.map(([t, label]) => `<button data-pin="${t}" class="${pinned.has(t) ? "on" : ""}" aria-pressed="${pinned.has(t)}">${pinned.has(t) ? "✓ " : "+ "}${label}</button>`).join("")}`;
+  if (pinned.has(tab)) $("tabs").querySelector('[data-tab="overview"]').click();
+  showTabs();
+  syncAnimation();
+  lastStrategy = 0; lastSlow = 0;
+  if (view) render();
+}
+$("pinbar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pin]");
+  if (!b) return;
+  const t = b.dataset.pin;
+  if (pinned.has(t)) pinned.delete(t); else pinned.add(t);
+  try { localStorage.setItem("undercut.pinned", JSON.stringify([...pinned])); } catch {}
+  placePinned();
+});
+placePinned();
+setCircleMode(circleMode);
 $("circleClear").addEventListener("click", () => { circleSel = null; if (view) updateCircle(view); });
 $("pitLoss").addEventListener("input", (e) => {
   const n = Number(e.target.value), slug = pitProfile(view).slug;

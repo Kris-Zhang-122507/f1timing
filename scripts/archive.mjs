@@ -210,8 +210,22 @@ async function main() {
   index.sessions.sort((a, b) => (b.startUtc ?? "").localeCompare(a.startUtc ?? ""));
 
   // circuits still missing a track map (the outline request can fail when OpenF1 is busy)
+  // Circuits still to come this season use last season's race there, so the live track map
+  // works the first time we visit.
+  const candidates = [...index.sessions];
+  try {
+    const coming = [...new Set(sessions.map((x) => x.circuit_short_name))].filter((c) => !existsSync(`${TRACKS}/${slug(c)}.json`));
+    if (coming.length) {
+      const last = await openf1(`sessions?year=${YEAR - 1}&session_name=Race`);
+      await pause(WAIT);
+      for (const c of coming) {
+        const r = last.find((x) => x.circuit_short_name === c);
+        if (r) candidates.push({ key: r.session_key, circuit: c });
+      }
+    }
+  } catch (e) { log(`  couldn't look up last season's circuits: ${e.message}`); }
   let tries = 0;
-  for (const entry of index.sessions) {
+  for (const entry of candidates) {
     const trackFile = `${TRACKS}/${slug(entry.circuit)}.json`;
     if (existsSync(trackFile) || tries >= 8) continue;
     tries++;
