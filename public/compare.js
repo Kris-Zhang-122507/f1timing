@@ -1,5 +1,5 @@
 // Compare: two drivers head to head.
-import { lapSeconds } from "./lib/race.js?v=mv3w144i";
+import { lapSeconds } from "./lib/race.js?v=mv3w7dx6";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace("+", "")); return Number.isFinite(n) ? n : null; };
@@ -26,7 +26,36 @@ function stat(label, a, b, show, note, higher = false) {
   </div>`;
 }
 
-export function renderCompare(v, aN, bN) {
+// Speed, throttle and brake along both drivers' fastest laps (from the archive job).
+function telemetryHtml(tele, A, B) {
+  if (tele === "shielded") return `<section class="card"><h2>Speed, throttle and brake</h2><div class="muted small">Hidden by the spoiler shield until the replay ends — the fastest laps would give away results. Untick “Spoiler shield” to see them now.</div></section>`;
+  const a = tele?.drivers?.[A.n], b = tele?.drivers?.[B.n];
+  if (!a || !b) {
+    return `<section class="card"><h2>Speed, throttle and brake</h2><div class="muted small">${tele ? "No telemetry for one of these drivers in this session." : "Appears once a session at this circuit has been archived (about an hour after it ends)."}</div></section>`;
+  }
+  const maxD = Math.max(a.d[a.d.length - 1], b.d[b.d.length - 1]);
+  const W = 1000;
+  const lane = (key, h, max, label, step = false) => {
+    const line = (t, col, dash) => {
+      const pts = t[key].map((v, i) => `${((t.d[i] / maxD) * W).toFixed(1)},${(h - 4 - (v / max) * (h - 8)).toFixed(1)}`).join(" ");
+      return `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" ${dash ? 'stroke-dasharray="6 4"' : ""} ${step ? 'stroke-linejoin="miter"' : 'stroke-linejoin="round"'}></polyline>`;
+    };
+    return `<div class="tele-lane"><div class="muted small caps">${label}</div>
+      <svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" class="tele-svg" style="height:${h}px" role="img" aria-label="${label} for ${esc(A.tla)} and ${esc(B.tla)}">${line(a, A.colour, false)}${line(b, B.colour, true)}</svg></div>`;
+  };
+  const vmax = Math.max(...a.speed, ...b.speed);
+  const da = a.time - b.time;
+  return `<section class="card">
+    <div class="card-head"><h2>Speed, throttle and brake — fastest laps</h2>
+      <span class="muted small">${esc(A.tla)} ${fmt(a.time)} (solid) vs ${esc(B.tla)} ${fmt(b.time)} (dashed) · ${da === 0 ? "identical" : `${da < 0 ? esc(A.tla) : esc(B.tla)} ${Math.abs(da).toFixed(3)}s quicker`}</span></div>
+    ${lane("speed", 150, vmax, `Speed (top ${vmax} km/h)`)}
+    ${lane("throttle", 60, 100, "Throttle")}
+    ${lane("brake", 34, 1, "Brake", true)}
+    <div class="muted small">Distance along the lap → (${(maxD / 1000).toFixed(2)} km)</div>
+  </section>`;
+}
+
+export function renderCompare(v, aN, bN, tele) {
   const rows = v.rows.filter((r) => r.pos < 99);
   if (rows.length < 2) return `<div class="muted empty">Waiting for timing data…</div>`;
   const A = rows.find((r) => r.n === aN) ?? rows[0];
@@ -88,5 +117,5 @@ export function renderCompare(v, aN, bN) {
       ${pairs.length ? `<div class="lapbars">${bars}</div><div class="small muted">${pairs[0].lap ? `Laps ${pairs[0].lap}–${pairs[pairs.length - 1].lap}` : ""} · ${esc(A.tla)} quicker on ${aWins} of ${usable.length} laps. Faded bars are pit stops or traffic.</div>`
         : `<div class="muted small">Builds up as both drivers complete laps while the page is open.</div>`}
     </section>
-    <p class="muted small">Speed, throttle and brake traces for each lap come after the session from OpenF1 — that's coming in the next batch.</p>`;
+    ${telemetryHtml(tele, A, B)}`;
 }

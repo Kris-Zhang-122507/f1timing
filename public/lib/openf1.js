@@ -181,6 +181,51 @@ export async function buildReplay(sessionKey, { fetchFn = fetch, wait = (typeof 
   ev.sort((a, b) => a.ms - b.ms);
   return {
     session,
+    laps,
     lines: ev.map((e) => ({ t: iso(e.ms), topic: e.topic, data: e.data })),
   };
+}
+
+// Each driver's fastest lap, as { driver, lap, start (ms), seconds }.
+export function fastestLaps(laps) {
+  const best = {};
+  for (const l of laps) {
+    if (!l.lap_duration || !l.date_start || l.is_pit_out_lap) continue;
+    if (!best[l.driver_number] || l.lap_duration < best[l.driver_number].seconds) {
+      best[l.driver_number] = { driver: l.driver_number, lap: l.lap_number, start: Date.parse(l.date_start), seconds: l.lap_duration };
+    }
+  }
+  return Object.values(best);
+}
+
+const range = (a, b) => `&date>=${new Date(a).toISOString()}&date<=${new Date(b).toISOString()}`;
+
+// Circuit outline from one clean lap of car positions: [[x, y], …] starting at the line.
+export async function trackOutline(sessionKey, lap, { fetchFn = fetch } = {}) {
+  const pts = await openf1(`location?session_key=${sessionKey}&driver_number=${lap.driver}${range(lap.start, lap.start + lap.seconds * 1000)}`, fetchFn);
+  const xy = pts.filter((p) => p.x || p.y).map((p) => [p.x, p.y]);
+  if (xy.length < 50) return null;
+  // thin to ~400 points and normalise into a 0–1000 box, keeping the shape's proportions
+  const step = Math.max(1, Math.floor(xy.length / 400));
+  const thin = xy.filter((_, i) => i % step === 0);
+  const xs = thin.map((p) => p[0]), ys = thin.map((p) => p[1]);
+  const minX = Math.min(...xs), minY = Math.min(...ys);
+  const scale = 1000 / Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY);
+  return thin.map(([x, y]) => [Math.round((x - minX) * scale), Math.round((Math.max(...ys) - y) * scale)]);
+}
+
+// Speed / throttle / brake / gear along a driver's fastest lap, ~250 samples, with distance.
+export async function lapTelemetry(sessionKey, lap, { fetchFn = fetch } = {}) {
+  const rows = await openf1(`car_data?session_key=${sessionKey}&driver_number=${lap.driver}${range(lap.start, lap.start + lap.seconds * 1000)}`, fetchFn);
+  if (rows.length < 20) return null;
+  let dist = 0, prev = null;
+  const all = rows.map((r) => {
+    const t = Date.parse(r.date);
+    if (prev) dist += ((prev.speed + r.speed) / 2 / 3.6) * ((t - prev.t) / 1000);
+    prev = { t, speed: r.speed };
+    return { d: Math.round(dist), speed: r.speed, throttle: r.throttle, brake: r.brake ? 1 : 0, gear: r.n_gear };
+  });
+  const step = Math.max(1, Math.floor(all.length / 250));
+  const s = all.filter((_, i) => i % step === 0);
+  return { lap: lap.lap, time: lap.seconds, d: s.map((x) => x.d), speed: s.map((x) => x.speed), throttle: s.map((x) => x.throttle), brake: s.map((x) => x.brake), gear: s.map((x) => x.gear) };
 }

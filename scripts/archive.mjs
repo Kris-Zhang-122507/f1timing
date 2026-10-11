@@ -14,11 +14,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { LiveState } from "../public/lib/state.js";
 import { Race } from "../public/lib/race.js";
-import { buildReplay, openf1 } from "../public/lib/openf1.js";
+import { buildReplay, openf1, fastestLaps, trackOutline, lapTelemetry } from "../public/lib/openf1.js";
 
 const YEAR = Number(process.argv[2]) || new Date().getUTCFullYear();
 const MEETINGS_BACK = Number(process.argv[3]) || 4;
 const OUT = "public/data/sessions";
+const TRACKS = "public/data/tracks";
+const TELEMETRY = "public/data/telemetry";
+const slug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const WAIT = process.env.OPENF1_WAIT ? Number(process.env.OPENF1_WAIT) : 2200;
 const KEEP = /^(Race|Qualifying|Sprint|Sprint Qualifying|Sprint Shootout)$/;
 
 // On GitHub Actions, "::notice::" / "::error::" lines show up as annotations on the run.
@@ -89,6 +94,8 @@ export function rate(lines, isRace) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
+  mkdirSync(TRACKS, { recursive: true });
+  mkdirSync(TELEMETRY, { recursive: true });
   const idxPath = `${OUT}/index.json`;
   const index = existsSync(idxPath) ? JSON.parse(readFileSync(idxPath, "utf8")) : { sessions: [] };
   const have = new Set(index.sessions.map((s) => s.key));
@@ -113,7 +120,7 @@ async function main() {
   for (const s of todo) {
     log(`Archiving ${s.country_name} — ${s.session_name} (${s.session_key}) …`);
     try {
-      const { lines } = await buildReplay(s.session_key, { log });
+      const { lines, laps } = await buildReplay(s.session_key, { log });
       if (lines.length < 100) { log("  not enough data yet"); continue; }
       const body = lines.map((l) => JSON.stringify(l)).join("\n") + "\n";
       const file = `${s.session_key}.jsonl.gz`;
@@ -126,6 +133,25 @@ async function main() {
         name: s.session_name, type: s.session_type, startUtc: s.date_start, file, sizeKb: Math.round(gz.length / 1024), ...rating,
       });
       added++;
+
+      // circuit outline (once per circuit) and everyone's fastest-lap telemetry
+      const best = fastestLaps(laps).sort((a, b) => a.seconds - b.seconds);
+      const trackFile = `${TRACKS}/${slug(s.circuit_short_name)}.json`;
+      if (best.length && !existsSync(trackFile)) {
+        try {
+          const outline = await trackOutline(s.session_key, best[0]);
+          if (outline) writeFileSync(trackFile, JSON.stringify({ circuit: s.circuit_short_name, points: outline }));
+        } catch (e) { log(`  no track outline: ${e.message}`); }
+        await pause(WAIT);
+      }
+      const tele = { key: s.session_key, circuit: s.circuit_short_name, drivers: {} };
+      for (const lap of best) {
+        try { const t = await lapTelemetry(s.session_key, lap); if (t) tele.drivers[lap.driver] = t; } catch (e) { log(`  no telemetry for ${lap.driver}: ${e.message}`); }
+        await pause(WAIT);
+      }
+      if (Object.keys(tele.drivers).length) writeFileSync(`${TELEMETRY}/${s.session_key}.json`, JSON.stringify(tele));
+      index.sessions[index.sessions.length - 1].telemetry = Object.keys(tele.drivers).length > 0;
+
       notice(`Saved ${s.country_name} ${s.session_name}: ${lines.length} messages, ${Math.round(gz.length / 1024)} KB, worth watching ${rating.score}/5`);
     } catch (e) {
       if (/401/.test(e.message)) { notice("OpenF1 locked (a session went live) — stopping for now."); break; }

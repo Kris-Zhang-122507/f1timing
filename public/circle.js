@@ -257,6 +257,8 @@ export class CircleView {
       this.lastF[c.n] = f;
       return { c, f };
     });
+    // shared with the track map, which places cars on the real circuit shape
+    this.lastPos = pos.map((p) => ({ n: p.c.n, f: p.f, inPit: p.c.inPit, tla: p.c.tla, colour: p.c.colour }));
 
     // spread labels so they never overlap
     const minSep = Math.min(0.034, 0.85 / Math.max(pos.length, 1));

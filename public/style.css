@@ -298,3 +298,13 @@ h2 .chip { font-size: 11px; padding: 3px 8px; vertical-align: middle; margin-lef
 .rain { display: flex; gap: 3px; }
 .rain span { flex: 1 1 0; height: 26px; border-radius: 4px; }
 .rain-axis { display: flex; justify-content: space-between; }
+
+/* track map */
+.track-svg { width: 100%; max-width: 900px; height: auto; }
+.track-svg .hit { cursor: pointer; }
+.tr-tla { font: 700 22px "Barlow Condensed", sans-serif; fill: #E8EAF0; text-anchor: middle; paint-order: stroke; stroke: #0B0D12; stroke-width: 4px; }
+.track-svg .c-sub { font-size: 20px; fill: #9AA3B2; text-anchor: middle; }
+
+/* telemetry */
+.tele-lane { display: flex; flex-direction: column; gap: 2px; }
+.tele-svg { width: 100%; display: block; background: var(--card2); border-radius: 6px; }

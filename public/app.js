@@ -1,14 +1,15 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3w144i";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3w144i";
-import { CircleView } from "./circle.js?v=mv3w144i";
-import { renderTyres } from "./tyres.js?v=mv3w144i";
-import { renderStrategy } from "./strategy.js?v=mv3w144i";
-import { renderCompare } from "./compare.js?v=mv3w144i";
-import { renderRewind } from "./rewind.js?v=mv3w144i";
-import { renderDriver } from "./driver.js?v=mv3w144i";
-import { Player, parseRecording } from "./player.js?v=mv3w144i";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3w144i";
+import { LiveState } from "./lib/state.js?v=mv3w7dx6";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3w7dx6";
+import { CircleView } from "./circle.js?v=mv3w7dx6";
+import { renderTyres } from "./tyres.js?v=mv3w7dx6";
+import { renderStrategy } from "./strategy.js?v=mv3w7dx6";
+import { renderCompare } from "./compare.js?v=mv3w7dx6";
+import { renderRewind } from "./rewind.js?v=mv3w7dx6";
+import { renderDriver } from "./driver.js?v=mv3w7dx6";
+import { Player, parseRecording } from "./player.js?v=mv3w7dx6";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3w7dx6";
+import { TrackView, loadTrack, circuitSlug } from "./track.js?v=mv3w7dx6";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -241,6 +242,7 @@ $("tab-replays").addEventListener("click", async (e) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const text = await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).text();
     startReplay(parseRecording(text), b.dataset.name);
+    replayKey = Number(b.dataset.file.split(".")[0]) || null;
     $("tabs").querySelector('[data-tab="overview"]').click();
   } catch (err) {
     b.textContent = "Couldn't load";
@@ -288,7 +290,7 @@ function render() {
 function drawSlow(v) {
   if (document.activeElement?.tagName === "SELECT") return;
   lastSlow = Date.now();
-  if (tab === "compare") $("tab-compare").innerHTML = renderCompare(v, cmpA, cmpB);
+  if (tab === "compare") $("tab-compare").innerHTML = renderCompare(v, cmpA, cmpB, telemetryFor(v));
   if (tab === "rewind") $("tab-rewind").innerHTML = renderRewind(v, rwFocus, rwMark);
   if (tab === "driver") $("tab-driver").innerHTML = renderDriver(v, dvSel, pitLoss);
 }
@@ -304,9 +306,49 @@ const circleView = new CircleView($("circle"), (n) => {
   circleSel = circleSel === n ? null : n;
   if (view) updateCircle(view);
 });
+// Circle or real track map
+let circleMode = "circle";
+const trackView = new TrackView($("trackMap"), circleView, (n) => {
+  circleSel = circleSel === n ? null : n;
+  if (view) updateCircle(view);
+});
+function setCircleMode(mode) {
+  circleMode = mode;
+  $("viewCircle").classList.toggle("on", mode === "circle");
+  $("viewTrack").classList.toggle("on", mode === "track");
+  $("circle").hidden = mode !== "circle";
+  $("trackMap").hidden = mode !== "track";
+  if (mode === "track" && tab === "circle") trackView.start(); else trackView.stop();
+  if (view) updateCircle(view);
+}
+$("viewCircle").addEventListener("click", () => setCircleMode("circle"));
+$("viewTrack").addEventListener("click", () => setCircleMode("track"));
+
+// Telemetry for Compare: this replay's session if archived, otherwise the latest archived
+// session at the same circuit (so live races show, e.g., qualifying laps).
+let replayKey = null;
+const teleCache = {};
+function telemetryFor(v) {
+  const sessions = archive?.sessions ?? [];
+  let key = replayKey;
+  if (!key || !sessions.some((s) => s.key === key && s.telemetry)) {
+    key = sessions.filter((s) => s.telemetry && circuitSlug(s.circuit) === circuitSlug(v.session.circuit))[0]?.key ?? null;
+  }
+  if (!archive) loadArchive().then(() => { lastSlow = 0; });
+  if (!key) return null;
+  // fastest laps of the session you're replaying would give the game away
+  if (key === replayKey && player && $("plShield").checked && player.idx < player.lines.length - 5) return "shielded";
+  if (!(key in teleCache)) {
+    teleCache[key] = null;
+    fetch(`data/telemetry/${key}.json`).then((r) => (r.ok ? r.json() : null)).then((t) => { teleCache[key] = t; lastSlow = 0; }).catch(() => {});
+  }
+  return teleCache[key];
+}
+
 function updateCircle(v) {
   if (v.now && v.now !== clockBase.now) clockBase = { now: v.now, at: Date.now() };
   circleView.setData(v, circleSel, pitLoss, circleNow);
+  if (circleMode === "track") loadTrack(v.session.circuit).then((pts) => trackView.setPoints(pts));
   const sel = v.rows.find((r) => r.n === circleSel);
   $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";
   $("circleClear").hidden = !sel;
@@ -658,6 +700,7 @@ $("tabs").addEventListener("click", (e) => {
   lastStrategy = 0;
   lastSlow = 0;
   if (tab === "circle") circleView.start(); else circleView.stop();
+  if (tab === "circle" && circleMode === "track") trackView.start(); else trackView.stop();
   if (view) render();
 });
 $("circleClear").addEventListener("click", () => { circleSel = null; if (view) updateCircle(view); });
