@@ -12,7 +12,8 @@
    },
    "sessions": [
     "2026 Race",
-    "2026 Sprint"
+    "2026 Sprint",
+    "2025 Race"
    ]
   },
   "kuala-lumpur": {
@@ -31,16 +32,17 @@
   },
   "baku": {
    "circuit": "Baku",
-   "green": 26.3,
+   "green": 21.1,
    "sc": null,
    "vsc": null,
    "samples": {
-    "green": 2,
+    "green": 20,
     "sc": 0,
     "vsc": 0
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "madring": {
@@ -59,31 +61,33 @@
   },
   "monza": {
    "circuit": "Monza",
-   "green": 33.5,
+   "green": 24.8,
    "sc": null,
    "vsc": 16.4,
    "samples": {
-    "green": 2,
+    "green": 20,
     "sc": 0,
     "vsc": 3
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "zandvoort": {
    "circuit": "Zandvoort",
    "green": 18.7,
-   "sc": null,
+   "sc": 14.6,
    "vsc": 12.5,
    "samples": {
     "green": 36,
-    "sc": 0,
+    "sc": 15,
     "vsc": 5
    },
    "sessions": [
     "2026 Race",
-    "2026 Sprint"
+    "2026 Sprint",
+    "2025 Race"
    ]
   },
   "hungaroring": {
@@ -97,21 +101,23 @@
     "vsc": 2
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "spa-francorchamps": {
    "circuit": "Spa-Francorchamps",
-   "green": 21.7,
+   "green": 24,
    "sc": null,
    "vsc": null,
    "samples": {
-    "green": 7,
+    "green": 32,
     "sc": 0,
     "vsc": 1
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "silverstone": {
@@ -288,8 +294,92 @@
    "sessions": [
     "2025 Race"
    ]
+  },
+  "austin": {
+   "circuit": "Austin",
+   "green": 20.7,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 20,
+    "sc": 0,
+    "vsc": 1
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "mexico-city": {
+   "circuit": "Mexico City",
+   "green": 21.5,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 26,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "interlagos": {
+   "circuit": "Interlagos",
+   "green": 21.2,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 34,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "las-vegas": {
+   "circuit": "Las Vegas",
+   "green": 22,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 15,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "lusail": {
+   "circuit": "Lusail",
+   "green": 25.9,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 22,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "yas-marina-circuit": {
+   "circuit": "Yas Marina Circuit",
+   "green": 22.6,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 27,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
   }
  },
- "scRatio": 0.6,
- "vscRatio": 0.62
+ "scRatio": 0.62,
+ "vscRatio": 0.66
 }

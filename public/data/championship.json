@@ -1,0 +1,341 @@
+{
+ "key": 11388,
+ "meeting": "Singapore",
+ "date": "2026-10-11T12:00:00+00:00",
+ "winner": "VER",
+ "drivers": [
+  {
+   "n": 12,
+   "code": "ANT",
+   "name": "Kimi ANTONELLI",
+   "team": "Mercedes",
+   "colour": "00D7B6",
+   "points": 340,
+   "pos": 1,
+   "pointsStart": 325,
+   "posStart": 1
+  },
+  {
+   "n": 63,
+   "code": "RUS",
+   "name": "George RUSSELL",
+   "team": "Mercedes",
+   "colour": "00D7B6",
+   "points": 238,
+   "pos": 2,
+   "pointsStart": 236,
+   "posStart": 2
+  },
+  {
+   "n": 44,
+   "code": "HAM",
+   "name": "Lewis HAMILTON",
+   "team": "Ferrari",
+   "colour": "ED1131",
+   "points": 229,
+   "pos": 3,
+   "pointsStart": 221,
+   "posStart": 3
+  },
+  {
+   "n": 3,
+   "code": "VER",
+   "name": "Max VERSTAPPEN",
+   "team": "Red Bull Racing",
+   "colour": "4781D7",
+   "points": 221,
+   "pos": 4,
+   "pointsStart": 196,
+   "posStart": 5
+  },
+  {
+   "n": 16,
+   "code": "LEC",
+   "name": "Charles LECLERC",
+   "team": "Ferrari",
+   "colour": "ED1131",
+   "points": 215,
+   "pos": 5,
+   "pointsStart": 197,
+   "posStart": 4
+  },
+  {
+   "n": 1,
+   "code": "NOR",
+   "name": "Lando NORRIS",
+   "team": "McLaren",
+   "colour": "F47600",
+   "points": 201,
+   "pos": 6,
+   "pointsStart": 189,
+   "posStart": 6
+  },
+  {
+   "n": 81,
+   "code": "PIA",
+   "name": "Oscar PIASTRI",
+   "team": "McLaren",
+   "colour": "F47600",
+   "points": 138,
+   "pos": 7,
+   "pointsStart": 128,
+   "posStart": 7
+  },
+  {
+   "n": 6,
+   "code": "HAD",
+   "name": "Isack HADJAR",
+   "team": "Red Bull Racing",
+   "colour": "4781D7",
+   "points": 97,
+   "pos": 8,
+   "pointsStart": 96,
+   "posStart": 8
+  },
+  {
+   "n": 30,
+   "code": "LAW",
+   "name": "Liam LAWSON",
+   "team": "Racing Bulls",
+   "colour": "6C98FF",
+   "points": 75,
+   "pos": 9,
+   "pointsStart": 69,
+   "posStart": 9
+  },
+  {
+   "n": 10,
+   "code": "GAS",
+   "name": "Pierre GASLY",
+   "team": "Alpine",
+   "colour": "00A1E8",
+   "points": 41,
+   "pos": 10,
+   "pointsStart": 41,
+   "posStart": 10
+  },
+  {
+   "n": 41,
+   "code": "LIN",
+   "name": "Arvid LINDBLAD",
+   "team": "Racing Bulls",
+   "colour": "6C98FF",
+   "points": 38,
+   "pos": 11,
+   "pointsStart": 38,
+   "posStart": 11
+  },
+  {
+   "n": 43,
+   "code": "COL",
+   "name": "Franco COLAPINTO",
+   "team": "Alpine",
+   "colour": "00A1E8",
+   "points": 27,
+   "pos": 12,
+   "pointsStart": 27,
+   "posStart": 12
+  },
+  {
+   "n": 87,
+   "code": "BEA",
+   "name": "Oliver BEARMAN",
+   "team": "Haas F1 Team",
+   "colour": "9C9FA2",
+   "points": 23,
+   "pos": 13,
+   "pointsStart": 23,
+   "posStart": 13
+  },
+  {
+   "n": 27,
+   "code": "HUL",
+   "name": "Nico HULKENBERG",
+   "team": "Audi",
+   "colour": "F50537",
+   "points": 13,
+   "pos": 14,
+   "pointsStart": 9,
+   "posStart": 15
+  },
+  {
+   "n": 5,
+   "code": "BOR",
+   "name": "Gabriel BORTOLETO",
+   "team": "Audi",
+   "colour": "F50537",
+   "points": 10,
+   "pos": 15,
+   "pointsStart": 10,
+   "posStart": 14
+  },
+  {
+   "n": 31,
+   "code": "OCO",
+   "name": "Esteban OCON",
+   "team": "Haas F1 Team",
+   "colour": "9C9FA2",
+   "points": 7,
+   "pos": 16,
+   "pointsStart": 7,
+   "posStart": 16
+  },
+  {
+   "n": 14,
+   "code": "ALO",
+   "name": "Fernando ALONSO",
+   "team": "Aston Martin",
+   "colour": "229971",
+   "points": 7,
+   "pos": 17,
+   "pointsStart": 7,
+   "posStart": 17
+  },
+  {
+   "n": 55,
+   "code": "SAI",
+   "name": "Carlos SAINZ",
+   "team": "Williams",
+   "colour": "1868DB",
+   "points": 7,
+   "pos": 18,
+   "pointsStart": 7,
+   "posStart": 18
+  },
+  {
+   "n": 23,
+   "code": "ALB",
+   "name": "Alexander ALBON",
+   "team": "Williams",
+   "colour": "1868DB",
+   "points": 5,
+   "pos": 19,
+   "pointsStart": 5,
+   "posStart": 19
+  },
+  {
+   "n": 22,
+   "code": "22",
+   "name": "",
+   "team": "",
+   "colour": null,
+   "points": 1,
+   "pos": 20,
+   "pointsStart": 1,
+   "posStart": 20
+  },
+  {
+   "n": 18,
+   "code": "STR",
+   "name": "Lance STROLL",
+   "team": "Aston Martin",
+   "colour": "229971",
+   "points": 0,
+   "pos": 21,
+   "pointsStart": 0,
+   "posStart": 21
+  },
+  {
+   "n": 77,
+   "code": "BOT",
+   "name": "Valtteri BOTTAS",
+   "team": "Cadillac",
+   "colour": "909090",
+   "points": 0,
+   "pos": 22,
+   "pointsStart": 0,
+   "posStart": 22
+  },
+  {
+   "n": 11,
+   "code": "PER",
+   "name": "Sergio PEREZ",
+   "team": "Cadillac",
+   "colour": "909090",
+   "points": 0,
+   "pos": 23,
+   "pointsStart": 0,
+   "posStart": 23
+  }
+ ],
+ "teams": [
+  {
+   "name": "Mercedes",
+   "points": 578,
+   "pos": 1,
+   "pointsStart": 561,
+   "posStart": 1
+  },
+  {
+   "name": "Ferrari",
+   "points": 444,
+   "pos": 2,
+   "pointsStart": 418,
+   "posStart": 2
+  },
+  {
+   "name": "McLaren",
+   "points": 339,
+   "pos": 3,
+   "pointsStart": 317,
+   "posStart": 3
+  },
+  {
+   "name": "Red Bull Racing",
+   "points": 332,
+   "pos": 4,
+   "pointsStart": 306,
+   "posStart": 4
+  },
+  {
+   "name": "Racing Bulls",
+   "points": 100,
+   "pos": 5,
+   "pointsStart": 94,
+   "posStart": 5
+  },
+  {
+   "name": "Alpine",
+   "points": 68,
+   "pos": 6,
+   "pointsStart": 68,
+   "posStart": 6
+  },
+  {
+   "name": "Haas F1 Team",
+   "points": 30,
+   "pos": 7,
+   "pointsStart": 30,
+   "posStart": 7
+  },
+  {
+   "name": "Audi",
+   "points": 23,
+   "pos": 8,
+   "pointsStart": 19,
+   "posStart": 8
+  },
+  {
+   "name": "Williams",
+   "points": 12,
+   "pos": 9,
+   "pointsStart": 12,
+   "posStart": 9
+  },
+  {
+   "name": "Aston Martin",
+   "points": 7,
+   "pos": 10,
+   "pointsStart": 7,
+   "posStart": 10
+  },
+  {
+   "name": "Cadillac",
+   "points": 0,
+   "pos": 11,
+   "pointsStart": 0,
+   "posStart": 11
+  }
+ ],
+ "updated": "2026-10-11T22:15:48.402Z"
+}
