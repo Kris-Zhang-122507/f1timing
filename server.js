@@ -9,8 +9,9 @@ import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSyn
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { LiveState } from "./state.js";
-import { Race } from "./race.js";
+import { inflateRawSync } from "node:zlib";
+import { LiveState } from "./public/lib/state.js";
+import { Race } from "./public/lib/race.js";
 import { connectLive } from "./f1feed.js";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -19,7 +20,7 @@ const args = process.argv.slice(2);
 const replayFile = args[0] === "--replay" ? args[1] : null;
 const speed = args.includes("--speed") ? Number(args[args.indexOf("--speed") + 1]) || 1 : 1;
 
-const state = new LiveState();
+const state = new LiveState({ inflate: (b64) => inflateRawSync(Buffer.from(b64, "base64")).toString("utf8") });
 const race = new Race(state);
 let mode = replayFile ? "replay" : "live";
 let status = replayFile ? `Replaying ${replayFile} at ${speed}x` : "Connecting to F1…";

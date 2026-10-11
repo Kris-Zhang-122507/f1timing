@@ -118,3 +118,10 @@ footer { text-align: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 4px; }
 .filters button { min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
 .filters button.on { border-color: var(--accent); color: var(--accent-soft); }
+
+/* recording controls */
+.rec { display: flex; align-items: center; gap: 6px; }
+.btn { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent-soft); }
+.rec select { min-height: 36px; background: var(--card2); color: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

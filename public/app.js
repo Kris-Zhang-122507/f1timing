@@ -1,4 +1,7 @@
-// Undercut page: receives the race view from the server and draws it.
+// Undercut page: draws the race view, from the Undercut server or worked out right here.
+import { LiveState } from "./lib/state.js";
+import { Race } from "./lib/race.js";
+
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -14,15 +17,114 @@ function segClass(s) {
   return "";
 }
 
+// ---------- data sources ----------
+// 1. Undercut server (npm start): the server does the work and sends us a ready-made view.
+// 2. Standalone (GitHub Pages, or ?direct): this page connects to F1 itself and does the work here.
+// 3. A recording file loaded with the "Load recording" button, replayed in this page.
+const params = new URLSearchParams(location.search);
+const standalone = location.hostname.endsWith("github.io") || params.has("direct");
+let serverSocket = null;
+let useServer = !standalone;
+
 function connect() {
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onmessage = (e) => { view = JSON.parse(e.data); render(); };
-  ws.onclose = () => {
+  if (!useServer) return;
+  serverSocket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  serverSocket.onmessage = (e) => { if (useServer) { view = JSON.parse(e.data); render(); } };
+  serverSocket.onclose = () => {
+    if (!useServer) return;
     $("conn").className = "conn";
     $("connText").textContent = "Disconnected from the Undercut server — retrying…";
     setTimeout(connect, 2000);
   };
 }
+
+// Local engine: the same timing logic the server uses, running in the browser.
+let engine = null;
+function newEngine(mode, status) {
+  const state = new LiveState();
+  engine = { state, race: new Race(state), mode, status, replayTime: null };
+}
+function feed(topic, data) {
+  try { engine.state.apply(topic, data); engine.race.update(); } catch (e) { console.warn("Couldn't apply", topic, e); }
+}
+setInterval(() => {
+  if (!engine) return;
+  view = { mode: engine.mode, status: engine.status, replayTime: engine.replayTime, ...engine.race.view() };
+  render();
+}, 500);
+
+const TOPICS = ["Heartbeat", "SessionInfo", "SessionStatus", "SessionData", "ExtrapolatedClock", "TrackStatus", "LapCount",
+  "DriverList", "TimingData", "TimingAppData", "TimingStats", "TopThree", "RaceControlMessages", "WeatherData", "TeamRadio"];
+let directSocket = null;
+
+function connectDirect() {
+  if (!engine || engine.mode !== "live") newEngine("live", "Connecting to F1 from your browser…");
+  const RS = "\x1e";
+  let gotData = false;
+  let ping = null;
+  directSocket = new WebSocket("wss://livetiming.formula1.com/signalrcore");
+  const ws = directSocket;
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ protocol: "json", version: 1 }) + RS);
+    ws.send(JSON.stringify({ type: 1, target: "Subscribe", arguments: [TOPICS], invocationId: "0" }) + RS);
+    ping = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ type: 6 }) + RS), 15000);
+  };
+  ws.onmessage = (e) => {
+    if (ws !== directSocket) return;
+    for (const part of String(e.data).split(RS)) {
+      if (!part) continue;
+      let m;
+      try { m = JSON.parse(part); } catch { continue; }
+      if (m.type === 1 && m.target === "feed") { gotData = true; feed(m.arguments[0], m.arguments[1]); }
+      else if (m.type === 3 && m.invocationId === "0") {
+        if (m.error) engine.status = `F1 refused the subscription: ${m.error}`;
+        else { gotData = true; for (const [t, d] of Object.entries(m.result ?? {})) feed(t, d); engine.status = "Live · direct from F1"; }
+      } else if (m.type === 7) engine.status = `F1 closed the connection${m.error ? ": " + m.error : ""}`;
+    }
+  };
+  ws.onclose = (e) => {
+    clearInterval(ping);
+    if (ws !== directSocket) return;
+    if (!gotData) {
+      engine.status = `Your browser couldn't connect to F1 directly (code ${e.code}). Live needs the Undercut server — you can still load a recording.`;
+    } else {
+      engine.status = "Connection lost — reconnecting…";
+      setTimeout(connectDirect, 3000);
+    }
+  };
+}
+
+// Replay a recording file (from npm start or the capture script) right here in the page.
+async function replayFile(file, speed) {
+  useServer = false;
+  serverSocket?.close();
+  const ds = directSocket;
+  directSocket = null;
+  ds?.close();
+  newEngine("replay", `Replaying ${file.name}`);
+  const myEngine = engine;
+  const lines = (await file.text()).split("\n");
+  let prevT = null;
+  for (const line of lines) {
+    if (engine !== myEngine) return; // another file was loaded
+    if (!line.trim()) continue;
+    let msg;
+    try { msg = JSON.parse(line); } catch { continue; }
+    const t = Date.parse(msg.t);
+    if (prevT !== null && t > prevT) await new Promise((r) => setTimeout(r, Math.min(3000, (t - prevT) / speed())));
+    prevT = t;
+    engine.replayTime = msg.t;
+    if (msg.snapshot) for (const [k, d] of Object.entries(msg.snapshot)) feed(k, d);
+    else if (msg.topic) feed(msg.topic, msg.data);
+  }
+  engine.status = "Replay finished";
+}
+
+$("recFile").addEventListener("change", (e) => {
+  const f = e.target.files?.[0];
+  if (f) replayFile(f, () => Number($("recSpeed").value) || 1);
+  e.target.value = "";
+});
 
 function render() {
   const v = view;
@@ -146,4 +248,4 @@ setInterval(() => {
   $("clock").textContent = `${t} left`;
 }, 1000);
 
-connect();
+if (standalone) connectDirect(); else connect();

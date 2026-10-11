@@ -1,12 +1,13 @@
 // Keeps a copy of the whole live-timing state and applies the feed's partial updates.
 // F1 sends a full snapshot once, then only the bits that changed ("deltas").
-import { inflateRawSync } from "node:zlib";
+// This file runs both in Node (server.js) and in the browser (GitHub Pages version).
 
 // Topics ending in .z arrive as base64-encoded, raw-deflate-compressed JSON.
-export function decode(topic, data) {
-  if (topic.endsWith(".z") && typeof data === "string") {
-    const json = inflateRawSync(Buffer.from(data, "base64")).toString("utf8");
-    return { topic: topic.slice(0, -2), data: JSON.parse(json) };
+// `inflate(base64) -> string` is passed in by Node; the browser skips these topics.
+export function decode(topic, data, inflate) {
+  if (topic.endsWith(".z")) {
+    if (!inflate || typeof data !== "string") return null;
+    return { topic: topic.slice(0, -2), data: JSON.parse(inflate(data)) };
   }
   return { topic, data };
 }
@@ -39,7 +40,8 @@ export function merge(target, update) {
 }
 
 export class LiveState {
-  constructor() {
+  constructor({ inflate } = {}) {
+    this.inflate = inflate;
     this.data = {};
     this.messages = 0;
     this.lastMessageAt = null;
@@ -52,7 +54,9 @@ export class LiveState {
   }
 
   apply(rawTopic, rawData) {
-    const { topic, data } = decode(rawTopic, rawData);
+    const decoded = decode(rawTopic, rawData, this.inflate);
+    if (!decoded) return;
+    const { topic, data } = decoded;
     // Event-like topics: keep a running list instead of merging.
     if (topic === "RaceControlMessages" || topic === "TeamRadio") {
       const key = topic === "TeamRadio" ? "Captures" : "Messages";

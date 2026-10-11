@@ -7,7 +7,8 @@
 // Unofficial project, not associated with Formula 1. Data from livetiming.formula1.com.
 import * as signalR from "@microsoft/signalr";
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
-import { LiveState } from "./state.js";
+import { inflateRawSync } from "node:zlib";
+import { LiveState } from "./public/lib/state.js";
 
 const BASE = "https://livetiming.formula1.com/signalrcore";
 
@@ -20,7 +21,7 @@ const TOPICS = [
   "PitLaneTimeCollection", "ChampionshipPrediction", "CarData.z", "Position.z",
 ];
 
-const state = new LiveState();
+const state = new LiveState({ inflate: (b64) => inflateRawSync(Buffer.from(b64, "base64")).toString("utf8") });
 const args = process.argv.slice(2);
 
 // ---------- terminal board ----------
