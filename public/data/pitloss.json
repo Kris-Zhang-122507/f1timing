@@ -121,12 +121,13 @@
    "vsc": null,
    "samples": {
     "green": 22,
-    "sc": 0,
+    "sc": 1,
     "vsc": 0
    },
    "sessions": [
     "2026 Race",
-    "2026 Sprint"
+    "2026 Sprint",
+    "2025 Race"
    ]
   },
   "spielberg": {
@@ -140,21 +141,23 @@
     "vsc": 5
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "catalunya": {
    "circuit": "Catalunya",
    "green": 22.3,
-   "sc": null,
+   "sc": 10.5,
    "vsc": null,
    "samples": {
     "green": 37,
-    "sc": 0,
+    "sc": 7,
     "vsc": 2
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "monte-carlo": {
@@ -168,7 +171,8 @@
     "vsc": 0
    },
    "sessions": [
-    "2026 Race"
+    "2026 Race",
+    "2025 Race"
    ]
   },
   "montreal": {
@@ -183,10 +187,109 @@
    },
    "sessions": [
     "2026 Race",
-    "2026 Sprint"
+    "2026 Sprint",
+    "2025 Race"
+   ]
+  },
+  "melbourne": {
+   "circuit": "Melbourne",
+   "green": 33,
+   "sc": 22.4,
+   "vsc": null,
+   "samples": {
+    "green": 6,
+    "sc": 3,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "shanghai": {
+   "circuit": "Shanghai",
+   "green": 21.6,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 24,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "suzuka": {
+   "circuit": "Suzuka",
+   "green": 22.9,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 21,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "sakhir": {
+   "circuit": "Sakhir",
+   "green": 21.4,
+   "sc": 13.2,
+   "vsc": null,
+   "samples": {
+    "green": 27,
+    "sc": 9,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "jeddah": {
+   "circuit": "Jeddah",
+   "green": 19.4,
+   "sc": null,
+   "vsc": null,
+   "samples": {
+    "green": 16,
+    "sc": 0,
+    "vsc": 0
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "miami": {
+   "circuit": "Miami",
+   "green": 19.3,
+   "sc": null,
+   "vsc": 10.5,
+   "samples": {
+    "green": 1,
+    "sc": 0,
+    "vsc": 3
+   },
+   "sessions": [
+    "2025 Race"
+   ]
+  },
+  "imola": {
+   "circuit": "Imola",
+   "green": 27.6,
+   "sc": 16.3,
+   "vsc": 15.9,
+   "samples": {
+    "green": 11,
+    "sc": 9,
+    "vsc": 7
+   },
+   "sessions": [
+    "2025 Race"
    ]
   }
  },
- "scRatio": 0.55,
- "vscRatio": 0.66
+ "scRatio": 0.6,
+ "vscRatio": 0.62
 }
