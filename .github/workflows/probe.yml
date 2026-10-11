@@ -1,4 +1,4 @@
-# Temporary: samples FIA documents so the parser can be written against real files. Safe to delete.
+# Temporary: test run of the FIA document collector. Safe to delete.
 name: Probe FIA access
 on: workflow_dispatch
 permissions:
@@ -7,24 +7,15 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Sample FIA documents
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Collect
         run: |
           which pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
-          mkdir out && cd out
-          B="https://www.fia.com"
-          curl -sL "$B/documents/championships/fia-formula-one-world-championship-14/season/season-2026-2072" -o season.html
-          curl -sL "$B/decision-document-list/nojs/60310" -o event-60310.html
-          curl -sL "$B/decision-document-list/nojs/60295" -o event-60295.html
-          for d in 2026_singapore_grand_prix_-_pu_elements_used_per_driver_up_to_now 2026_singapore_grand_prix_-_car_presentation_submissions; do
-            curl -sL "$B/system/files/decision-document/$d.pdf" -o "$d.pdf" && pdftotext -layout "$d.pdf" "$d.txt"
-          done
-          grep -o 'decision-document/[^"]*\.pdf' event-60310.html | sort -u > event-60310-pdfs.txt || true
-          grep -o 'decision-document/[^"]*\.pdf' event-60295.html | sort -u > event-60295-pdfs.txt || true
-          for d in $(grep -E 'pu_elements_used|car_presentation' event-60310-pdfs.txt | head -2); do
-            f=$(basename "$d" .pdf); curl -sL "$B/system/files/$d" -o "$f.pdf" && pdftotext -layout "$f.pdf" "$f.txt"
-          done
-          rm -f *.pdf
-          ls -la
-          git init -q . && git config user.name probe && git config user.email probe@users.noreply.github.com
+          node scripts/fia.mjs 2>&1 | tee fia-log.txt
+          mkdir out && cp -r public/data/fia out/ && cp fia-log.txt out/
+          cd out && git init -q . && git config user.name probe && git config user.email probe@users.noreply.github.com
           git add -A && git commit -qm probe
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/probe
