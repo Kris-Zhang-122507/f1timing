@@ -1,13 +1,14 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3vszxu";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3vszxu";
-import { CircleView } from "./circle.js?v=mv3vszxu";
-import { renderTyres } from "./tyres.js?v=mv3vszxu";
-import { renderStrategy } from "./strategy.js?v=mv3vszxu";
-import { renderCompare } from "./compare.js?v=mv3vszxu";
-import { renderRewind } from "./rewind.js?v=mv3vszxu";
-import { renderDriver } from "./driver.js?v=mv3vszxu";
-import { Player, parseRecording } from "./player.js?v=mv3vszxu";
+import { LiveState } from "./lib/state.js?v=mv3w144i";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3w144i";
+import { CircleView } from "./circle.js?v=mv3w144i";
+import { renderTyres } from "./tyres.js?v=mv3w144i";
+import { renderStrategy } from "./strategy.js?v=mv3w144i";
+import { renderCompare } from "./compare.js?v=mv3w144i";
+import { renderRewind } from "./rewind.js?v=mv3w144i";
+import { renderDriver } from "./driver.js?v=mv3w144i";
+import { Player, parseRecording } from "./player.js?v=mv3w144i";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv3w144i";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -16,6 +17,7 @@ let view = null;
 let rcFilter = "all";
 let tab = "overview";
 let lastStrategy = 0;
+let lastSched = 0;
 let lastSlow = 0;          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
 let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
 let dvSel = null;
@@ -274,6 +276,8 @@ function render() {
     renderRcm(v);
   }
   handleRadio(v);
+  checkGame(v);
+  if (tab === "schedule" && Date.now() - lastSched > 5000) drawSchedule(v);
   if (tab === "circle") updateCircle(v);
   if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
   if (tab === "strategy" && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss); }
@@ -530,13 +534,126 @@ $("explain").addEventListener("click", (e) => {
   document.body.classList.toggle("facts-only", b.dataset.mode === "facts");
 });
 
+// ---------- schedule + pit-call game ----------
+let races = null;
+async function drawSchedule(v) {
+  lastSched = Date.now();
+  renderGame(v);
+  try { races ??= await loadSchedule(); } catch { races = []; }
+  $("schedBox").innerHTML = renderSchedule(races);
+}
+
+// Predict the lap a driver will pit on. Exact = 10 points, within 2 laps = 5.
+function gameData() {
+  try { return JSON.parse(localStorage.getItem("undercut.game")) ?? { points: 0, picks: {} }; } catch { return { points: 0, picks: {} }; }
+}
+function saveGame(g) { try { localStorage.setItem("undercut.game", JSON.stringify(g)); } catch {} }
+const sessionId = (v) => `${v?.session?.meeting ?? ""}|${v?.session?.name ?? ""}`;
+const isRaceSession = (v) => v?.totalLaps > 0 && !v.quali;
+
+let gameKey = "";
+function renderGame(v, force = false) {
+  const box = $("pitGame");
+  const g = gameData();
+  const pick = g.picks[sessionId(v)];
+  // only rebuild when something changed, so the form doesn't reset while you use it
+  const key = `${sessionId(v)}|${isRaceSession(v)}|${v?.rows?.length ?? 0}|${JSON.stringify(pick ?? null)}|${g.points}`;
+  if (key === gameKey && !force) return;
+  gameKey = key;
+  const head = `<div class="card-head"><h2>Pit-call game</h2><span class="mono">${g.points} pts</span></div>`;
+  if (!v || !isRaceSession(v)) {
+    box.innerHTML = `${head}<div class="muted small">Opens during races and sprints (live or replay). Guess the lap a driver pits: exact = 10 points, within 2 laps = 5.</div>`;
+    return;
+  }
+  if (pick?.result) {
+    const r = pick.result;
+    box.innerHTML = `${head}<div>You called <b>${esc(pick.tla)}</b> on lap ${pick.lap}. They pitted on lap <b>${r.actual}</b> — ${r.pts ? `<span class="good">+${r.pts} points!</span>` : "no points this time."}</div>`;
+    return;
+  }
+  if (pick) {
+    box.innerHTML = `${head}<div>Locked in: <b>${esc(pick.tla)}</b> pits on <b>lap ${pick.lap}</b>. Waiting for their stop…</div><button class="btn" id="gameCancel">Change my pick</button>`;
+    return;
+  }
+  if (!v.rows.length) { box.innerHTML = `${head}<div class="muted small">Waiting for timing data…</div>`; return; }
+  const opts = v.rows.filter((r) => r.pos < 99 && !r.out).map((r) => `<option value="${esc(r.n)}">${esc(r.tla)} — P${r.pos}, ${esc(r.tyre)} ${esc(r.tyreAge)} laps</option>`).join("");
+  box.innerHTML = `${head}
+    <div class="game-form">
+      <label>Driver <select id="gameDrv">${opts}</select></label>
+      <label>Pits on lap <input type="number" id="gameLap" min="${v.lap + 1}" max="${v.totalLaps}" value="${Math.min(v.totalLaps, v.lap + 5)}"></label>
+      <button class="btn primary" id="gameLock">Lock in</button>
+    </div>
+    <div class="muted small">Exact lap = 10 points · within 2 laps = 5. Scored automatically when they stop.</div>`;
+}
+
+function checkGame(v) {
+  if (!v || !isRaceSession(v)) return;
+  const g = gameData();
+  const pick = g.picks[sessionId(v)];
+  if (!pick || pick.result) return;
+  const stop = [...v.story].reverse().find((e) => e.type === "pit" && e.head.startsWith(`${pick.tla} pits`) && (e.lap ?? 0) >= pick.madeOn);
+  if (!stop) return;
+  const diff = Math.abs(stop.lap - pick.lap);
+  const pts = diff === 0 ? 10 : diff <= 2 ? 5 : 0;
+  pick.result = { actual: stop.lap, pts };
+  g.points += pts;
+  saveGame(g);
+  if (tab === "schedule") renderGame(v);
+}
+
+$("tab-schedule").addEventListener("click", (e) => {
+  if (!view) return;
+  if (e.target.id === "gameLock") {
+    const n = $("gameDrv").value, lap = Number($("gameLap").value);
+    const r = view.rows.find((x) => x.n === n);
+    if (!r || !lap || lap <= view.lap) { $("gameLap").focus(); return; }
+    const g = gameData();
+    g.picks[sessionId(view)] = { n, tla: r.tla, lap, madeOn: view.lap };
+    saveGame(g);
+    document.activeElement?.blur();
+    renderGame(view);
+  }
+  if (e.target.id === "gameCancel") {
+    const g = gameData();
+    delete g.picks[sessionId(view)];
+    saveGame(g);
+    renderGame(view);
+  }
+});
+
+// ---------- rain watch (Open-Meteo, free) ----------
+let wx = { at: 0, html: "" };
+async function updateWeather() {
+  if (view?.mode === "replay") { $("weatherBox").innerHTML = `<div class="muted small">The forecast is for live sessions — replays show the weather as it was in the header.</div>`; return; }
+  if (Date.now() - wx.at < 10 * 60e3 && wx.html) { $("weatherBox").innerHTML = wx.html; return; }
+  try {
+    races ??= await loadSchedule();
+    const w = currentWeekend(races);
+    if (!Number.isFinite(w?.lat)) throw new Error("no circuit");
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}&minutely_15=precipitation,precipitation_probability&forecast_minutely_15=8&timezone=UTC`);
+    const d = (await r.json()).minutely_15;
+    const blocks = d.time.map((t, i) => ({ t: new Date(t + "Z"), mm: d.precipitation[i] ?? 0, p: d.precipitation_probability?.[i] ?? 0 }));
+    const first = blocks.find((b) => b.mm >= 0.1 || b.p >= 50);
+    const mins = first ? Math.max(0, Math.round((first.t - Date.now()) / 60e3)) : null;
+    const msg = !first ? `Dry at ${esc(w.locality)} for the next 2 hours.` : mins <= 5 ? `Rain at ${esc(w.locality)} now or any minute.` : `Rain likely at ${esc(w.locality)} in about ${mins} minutes${view?.refLap ? ` (~${Math.max(1, Math.round((mins * 60) / view.refLap))} laps)` : ""}.`;
+    wx = { at: Date.now(), html: `<div class="rain">${blocks.map((b) => `<span title="${b.t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}: ${b.p}% chance, ${b.mm} mm" style="background:${b.mm >= 1 ? "#2B6CB0" : b.mm >= 0.1 || b.p >= 50 ? "#1E4E73" : b.p >= 25 ? "#14324A" : "#1A1E27"}"></span>`).join("")}</div>
+      <div class="rain-axis muted small"><span>now</span><span>+1h</span><span>+2h</span></div>
+      <div class="small ${first ? "warn" : "muted"}">${msg}</div>` };
+    $("weatherBox").innerHTML = wx.html;
+  } catch {
+    $("weatherBox").innerHTML = `<div class="muted small">Forecast unavailable right now.</div>`;
+  }
+}
+setInterval(updateWeather, 60e3);
+setTimeout(updateWeather, 1500);
+
 // ---------- tabs + circle controls ----------
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays", "schedule"]) $(`tab-${t}`).hidden = t !== tab;
+  if (tab === "schedule") { lastSched = 0; drawSchedule(view); }
   if (tab === "replays") renderReplays();
   lastStrategy = 0;
   lastSlow = 0;

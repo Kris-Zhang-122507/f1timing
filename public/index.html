@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv3vszxu">
+<link rel="stylesheet" href="style.css?v=mv3w144i">
 </head>
 <body>
 <div class="wrap">
@@ -62,6 +62,7 @@
     <button data-tab="rewind">Rewind</button>
     <button data-tab="driver">My driver</button>
     <button data-tab="replays">Replays</button>
+    <button data-tab="schedule">Schedule</button>
   </nav>
 
   <section class="card" id="tab-circle" hidden>
@@ -87,6 +88,10 @@
   <div id="tab-rewind" class="stack" hidden></div>
   <div id="tab-driver" hidden></div>
   <div id="tab-replays" class="stack" hidden></div>
+  <div id="tab-schedule" class="stack" hidden>
+    <section class="card" id="pitGame"></section>
+    <div id="schedBox" class="stack"></div>
+  </div>
 
   <main class="grid" id="tab-overview">
     <section class="card table-card">
@@ -127,6 +132,10 @@
         <div id="story" class="feed"><div class="muted small">Pit stops, overtakes, fastest laps and safety cars will show up here.</div></div>
       </section>
       <section class="card">
+        <div class="card-head"><h2>Rain watch</h2><span class="muted small">next 2 hours at the circuit</span></div>
+        <div id="weatherBox"><div class="muted small">Loading forecast…</div></div>
+      </section>
+      <section class="card">
         <div class="card-head">
           <h2>Team radio</h2>
           <label class="muted small autoplay"><input type="checkbox" id="radioAuto"> Auto-play new clips</label>
@@ -150,6 +159,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv3vszxu"></script>
+<script type="module" src="app.js?v=mv3w144i"></script>
 </body>
 </html>
