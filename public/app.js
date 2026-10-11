@@ -1,12 +1,18 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
 import { LiveState } from "./lib/state.js";
 import { Race } from "./lib/race.js";
+import { renderCircle } from "./circle.js";
+import { renderTyres } from "./tyres.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 let view = null;
 let rcFilter = "all";
+let tab = "overview";
+let circleSel = null;
+let pitLoss = 24;
+try { pitLoss = Number(localStorage.getItem("undercut.pitLoss")) || 24; } catch {}
 
 // Minisector status codes from the F1 feed
 function segClass(s) {
@@ -103,6 +109,8 @@ async function replayFile(file, speed) {
   ds?.close();
   newEngine("replay", `Replaying ${file.name}`);
   const myEngine = engine;
+  let simNow = null;
+  engine.race.now = () => simNow ?? Date.now();
   const lines = (await file.text()).split("\n");
   let prevT = null;
   for (const line of lines) {
@@ -113,6 +121,7 @@ async function replayFile(file, speed) {
     const t = Date.parse(msg.t);
     if (prevT !== null && t > prevT) await new Promise((r) => setTimeout(r, Math.min(3000, (t - prevT) / speed())));
     prevT = t;
+    if (Number.isFinite(t)) simNow = t;
     engine.replayTime = msg.t;
     if (msg.snapshot) for (const [k, d] of Object.entries(msg.snapshot)) feed(k, d);
     else if (msg.topic) feed(msg.topic, msg.data);
@@ -145,6 +154,15 @@ function render() {
   renderBattles(v);
   renderStory(v);
   renderRcm(v);
+  if (tab === "circle") renderCircleTab(v);
+  if (tab === "tyres") $("tyres").innerHTML = renderTyres(v);
+}
+
+function renderCircleTab(v) {
+  $("circle").innerHTML = renderCircle(v, circleSel, pitLoss);
+  const sel = v.rows.find((r) => r.n === circleSel);
+  $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";
+  $("circleClear").hidden = !sel;
 }
 
 function renderStrip(v) {
@@ -210,7 +228,10 @@ function renderBattles(v) {
 
 const BADGE = { pit: "Pit", overtake: "Overtake", fastest: "Fastest lap", sc: "Safety car", red: "Red flag", green: "Green flag", out: "Retired" };
 function renderStory(v) {
-  if (!v.story.length) return;
+  if (!v.story.length) {
+    $("story").innerHTML = `<div class="muted small">${v.watchingSince ? `Watching since lap ${v.watchingSince}. ` : ""}Pit stops, overtakes, fastest laps and safety cars will show up here as they happen.</div>`;
+    return;
+  }
   $("story").innerHTML = v.story.map((e) => `<div class="item">
     <div class="when">${e.lap ? "L" + e.lap : ""}</div>
     <div class="what"><span class="badge ${e.type}">${BADGE[e.type] ?? e.type}</span><div class="head">${esc(e.head)}</div>${e.body ? `<div class="note">${esc(e.body)}</div>` : ""}</div>
@@ -235,6 +256,29 @@ $("rcFilters").addEventListener("click", (e) => {
   rcFilter = b.dataset.f;
   for (const x of $("rcFilters").children) x.classList.toggle("on", x === b);
   if (view) renderRcm(view);
+});
+
+// ---------- tabs + circle controls ----------
+$("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  tab = b.dataset.tab;
+  for (const x of $("tabs").children) x.classList.toggle("on", x === b);
+  for (const t of ["overview", "circle", "tyres"]) $(`tab-${t}`).hidden = t !== tab;
+  if (view) render();
+});
+$("circle").addEventListener("click", (e) => {
+  const hit = e.target.closest("[data-n]");
+  if (!hit) return;
+  circleSel = circleSel === hit.dataset.n ? null : hit.dataset.n;
+  if (view) renderCircleTab(view);
+});
+$("circleClear").addEventListener("click", () => { circleSel = null; if (view) renderCircleTab(view); });
+$("pitLoss").value = pitLoss;
+$("pitLoss").addEventListener("input", (e) => {
+  pitLoss = Number(e.target.value) || 24;
+  try { localStorage.setItem("undercut.pitLoss", String(pitLoss)); } catch {}
+  if (view) renderCircleTab(view);
 });
 
 // Session clock counts down between updates

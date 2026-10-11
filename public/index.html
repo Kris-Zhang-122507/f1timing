@@ -33,7 +33,31 @@
     <div class="lapstrip" id="lapStrip"></div>
   </section>
 
-  <main class="grid">
+  <nav class="tabs" id="tabs" aria-label="Views">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="circle">Circle of doom</button>
+    <button data-tab="tyres">Tyres</button>
+  </nav>
+
+  <section class="card" id="tab-circle" hidden>
+    <div class="card-head">
+      <h2>Circle of doom</h2>
+      <div class="circle-tools">
+        <span class="muted small" id="circleSel">Tap a car to make it the reference</span>
+        <button class="btn" id="circleClear" hidden>Clear</button>
+        <label class="muted small">Pit stop costs <input type="number" id="pitLoss" min="10" max="45" step="1" value="24"> s</label>
+      </div>
+    </div>
+    <div id="circle" class="circle-wrap"></div>
+    <p class="muted small">Cars are placed by their timing gap behind the leader. Red arcs = within a second. The shaded band shows where the selected car would rejoin if it pitted now.</p>
+  </section>
+
+  <section class="card" id="tab-tyres" hidden>
+    <h2>Tyre strategy</h2>
+    <div id="tyres"></div>
+  </section>
+
+  <main class="grid" id="tab-overview">
     <section class="card table-card">
       <div class="card-head">
         <h2>Timing</h2>

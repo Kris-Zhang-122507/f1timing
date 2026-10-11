@@ -125,3 +125,34 @@ footer { text-align: center; }
 .btn:hover { border-color: var(--accent); color: var(--accent-soft); }
 .rec select { min-height: 36px; background: var(--card2); color: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; padding: 4px; background: var(--card); border-radius: 10px; align-self: flex-start; flex-wrap: wrap; }
+.tabs button { min-height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); font: 600 15px "Barlow", sans-serif; cursor: pointer; }
+.tabs button.on { background: #262B36; color: var(--text); }
+
+/* circle of doom */
+.circle-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.circle-tools input { width: 56px; min-height: 32px; background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font: inherit; }
+.circle-wrap { display: flex; justify-content: center; }
+.circle-svg { width: 100%; max-width: 820px; height: auto; }
+.circle-svg .hit { cursor: pointer; }
+.circle-svg text { font-family: "Barlow", sans-serif; text-anchor: middle; }
+.c-tla { font: 700 15px "Barlow Condensed", sans-serif; fill: #E8EAF0; }
+.c-gap { font: 10px "JetBrains Mono", monospace; fill: #9AA3B2; }
+.c-lap { font: 700 64px "Barlow Condensed", sans-serif; fill: #E8EAF0; }
+.c-sub { font-size: 13px; fill: #9AA3B2; }
+.c-call { font-size: 18px; font-weight: 600; fill: #FFD08A; }
+.c-sector { font: 600 12px "JetBrains Mono", monospace; fill: #C3C9D4; dominant-baseline: middle; }
+.c-band { fill: #2E3340; stroke: #6B7383; stroke-dasharray: 4 4; }
+.c-band-sc { fill: #5A4214; stroke: #FFB547; }
+.c-trail { fill: none; stroke: #FFB547; stroke-width: 3; stroke-dasharray: 2 6; stroke-linecap: round; }
+
+/* tyres */
+.tyres-table { min-width: 900px; }
+.stints-cell { width: 50%; }
+.stints { position: relative; display: flex; height: 22px; background: var(--line2); border-radius: 4px; }
+.stint { height: 22px; box-sizing: border-box; border-radius: 4px; display: flex; align-items: center; padding-left: 6px; font: 600 11px "JetBrains Mono", monospace; overflow: hidden; white-space: nowrap; }
+.stint + .stint { margin-left: 2px; }
+.now-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--accent); }
+.hot { color: #FF8A65 !important; } .warm { color: var(--accent-soft) !important; } .cool { color: var(--g) !important; }

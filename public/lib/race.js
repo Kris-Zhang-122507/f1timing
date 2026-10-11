@@ -16,6 +16,23 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// "1:37.623" -> 97.623
+export function lapSeconds(v) {
+  const m = String(v ?? "").match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+  return m ? (Number(m[1] ?? 0) * 60 + Number(m[2])) : null;
+}
+
+// A typical green-flag lap right now: median of recent laps, ignoring slow outliers.
+function referenceLap(rows) {
+  const recent = [];
+  for (const r of rows) for (const h of r.hist.slice(-5)) recent.push(h.s);
+  if (recent.length < 5) for (const r of rows) { const s = lapSeconds(r.last); if (s) recent.push(s); }
+  if (!recent.length) return null;
+  const best = Math.min(...recent);
+  const ok = recent.filter((s) => s < best * 1.07).sort((a, b) => a - b);
+  return ok[Math.floor(ok.length / 2)] ?? null;
+}
+
 const list = (v) => (Array.isArray(v) ? v : Object.values(v ?? {}));
 
 // ---------- plain-English notes for FIA race control messages ----------
@@ -87,6 +104,10 @@ export class Race {
     this.pitsThisLap = {};
     this.lastTrack = null;
     this.fastest = null;
+    this.now = () => Date.now(); // replays swap this for the recording's clock
+    this.lapStart = {};          // driver -> time they last crossed the line
+    this.lapHist = {};           // driver -> [{ lap, s (seconds), tyre }]
+    this.watchingSince = null;
   }
 
   get lap() {
@@ -110,6 +131,7 @@ export class Race {
     const lines = d.TimingData?.Lines ?? {};
     const track = String(d.TrackStatus?.Status ?? "");
     const lap = this.lap;
+    if (this.watchingSince === null && lap > 0) this.watchingSince = lap;
 
     // Track status changes
     if (track && track !== this.lastTrack) {
@@ -163,6 +185,15 @@ export class Race {
           this.add("fastest", `Fastest lap: ${name} ${c.last}`, "");
         }
         // Interval history at each lap completion (for battle trends)
+        if (c.laps > p.laps) {
+          this.lapStart[n] = this.now();
+          const secs = lapSeconds(c.last);
+          if (secs) {
+            const hist = (this.lapHist[n] ??= []);
+            hist.push({ lap: c.laps, s: secs, tyre: (this.currentStint(n)?.Compound ?? "?").charAt(0) });
+            if (hist.length > 80) hist.shift();
+          }
+        }
         if (c.laps > p.laps && c.interval != null) {
           const h = (this.intervalHist[n] ??= []);
           h.push(c.interval);
@@ -243,7 +274,10 @@ export class Race {
         tyre: (stint.Compound ?? "").charAt(0) || "?",
         tyreAge: stint.TotalLaps ?? "",
         tyreNew: stint.New === "true" || stint.New === true,
-        stints: stints.map((s) => ({ c: (s.Compound ?? "?").charAt(0), laps: Number(s.TotalLaps) || 0, isNew: s.New === "true" || s.New === true })),
+        lapStart: this.lapStart[n] ?? null,
+        hist: this.lapHist[n] ?? [],
+        // laps run in this race on each set = current tyre age minus its age when fitted
+        stints: stints.map((s) => ({ c: (s.Compound ?? "?").charAt(0), laps: Math.max(0, (Number(s.TotalLaps) || 0) - (Number(s.StartLaps) || 0)), age: Number(s.TotalLaps) || 0, isNew: s.New === "true" || s.New === true })),
       };
     }).sort((a, b) => a.pos - b.pos);
 
@@ -289,6 +323,9 @@ export class Race {
       story: this.story.slice(-40).reverse(),
       rcm,
       messages: this.state.messages,
+      now: this.now(),
+      watchingSince: this.watchingSince,
+      refLap: referenceLap(rows),
     };
   }
 }
