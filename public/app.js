@@ -1,18 +1,18 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4efh2u";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4efh2u";
-import { CircleView } from "./circle.js?v=mv4efh2u";
-import { renderTyres } from "./tyres.js?v=mv4efh2u";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4efh2u";
-import { renderCompare } from "./compare.js?v=mv4efh2u";
-import { renderRewind } from "./rewind.js?v=mv4efh2u";
-import { renderDriver } from "./driver.js?v=mv4efh2u";
-import { Player, parseRecording } from "./player.js?v=mv4efh2u";
-import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4efh2u";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4efh2u";
-import { Dashboard } from "./dash.js?v=mv4efh2u";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4efh2u";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4efh2u";
+import { LiveState } from "./lib/state.js?v=mv4ejxsf";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4ejxsf";
+import { CircleView } from "./circle.js?v=mv4ejxsf";
+import { renderTyres } from "./tyres.js?v=mv4ejxsf";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4ejxsf";
+import { renderCompare } from "./compare.js?v=mv4ejxsf";
+import { renderRewind } from "./rewind.js?v=mv4ejxsf";
+import { renderDriver } from "./driver.js?v=mv4ejxsf";
+import { Player, parseRecording } from "./player.js?v=mv4ejxsf";
+import { loadSchedule, currentWeekend, renderSchedule } from "./schedule.js?v=mv4ejxsf";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4ejxsf";
+import { Dashboard } from "./dash.js?v=mv4ejxsf";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4ejxsf";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4ejxsf";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

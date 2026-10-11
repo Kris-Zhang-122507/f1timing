@@ -424,3 +424,12 @@ body[data-flag="red"]::before { background: #FF4D4D; }
 .w-head > :not(h2):not(.w-close) { min-width: 0; overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; scrollbar-width: none; }
 .w-head > :not(h2):not(.w-close)::-webkit-scrollbar { display: none; }
 .w-head .filters, .w-head .legend, .w-head .circle-tools { flex-wrap: nowrap; }
+
+/* slim dark scrollbars to match the panels (Firefox uses the first two lines, Chrome/Edge/Safari the rest) */
+* { scrollbar-width: thin; scrollbar-color: #343A48 transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: #343A48; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #4A5160; background-clip: padding-box; }
+::-webkit-scrollbar-button { display: none; }
+html { color-scheme: dark; }
