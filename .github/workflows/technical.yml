@@ -1,0 +1,38 @@
+# Every 3 hours: read this season's FIA documents (car upgrades, power unit usage) into
+# public/data/fia/ for the Technical tab. Separate from the archive job so it never waits on it.
+name: Technical documents
+
+on:
+  schedule:
+    - cron: "37 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: technical
+  cancel-in-progress: false
+
+jobs:
+  fia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read FIA documents
+        run: |
+          which pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
+          timeout 1800 node scripts/fia.mjs
+      - name: Save
+        run: |
+          git config user.name "undercut-archive"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/data/fia
+          if git diff --cached --quiet; then echo "Nothing new."; else
+            git commit -m "Technical: update FIA documents"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done
+          fi

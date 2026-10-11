@@ -114,13 +114,15 @@ async function main() {
   const latest = withPu[withPu.length - 1];
   const history = {};
   let prev = {};
-  for (const e of withPu) {
+  for (const [idx, e] of withPu.entries()) {
     for (const r of e.pu) {
-      const before = prev[r.n] ?? Object.fromEntries(PU_ELEMENTS.map((k) => [k, 0]));
+      const before = prev[r.n];
+      if (!before) continue; // the first report we have is the starting point, not new parts
       const fresh = PU_ELEMENTS.filter((k) => r.used[k] > before[k]).map((k) => `${k}${r.used[k] - before[k] > 1 ? " ×" + (r.used[k] - before[k]) : ""}`);
       if (fresh.length) (history[r.n] ??= []).push({ round: e.round, event: e.name, parts: fresh });
     }
-    prev = Object.fromEntries(e.pu.map((r) => [r.n, r.used]));
+    for (const r of e.pu) prev[r.n] = r.used; // carry forward drivers missing from a report
+    void idx;
   }
 
   const data = {

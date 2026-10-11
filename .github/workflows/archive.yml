@@ -32,11 +32,6 @@ jobs:
         run: node scripts/archive.mjs "" "${{ github.event.inputs.meetings || '4' }}"
       - name: Latest headlines
         run: node scripts/news.mjs
-      - name: FIA documents (upgrades, power unit usage)
-        run: |
-          which pdftotext || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
-          timeout 1200 node scripts/fia.mjs
-        continue-on-error: true
       - name: Crash cost estimates
         run: node scripts/crashcost.mjs
         continue-on-error: true

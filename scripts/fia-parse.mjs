@@ -30,11 +30,13 @@ function chunks(line) {
 
 const TYPE = (reason) => {
   const r = reason.toLowerCase();
-  if (r.startsWith("performance")) return "Performance";
-  if (r.startsWith("circuit")) return "Circuit specific";
-  if (r.startsWith("reliab")) return "Reliability";
-  return reason ? reason.split(/\s*-\s*/)[0] : "Other";
+  if (r.includes("circuit")) return "Circuit specific";
+  if (r.includes("reliab")) return "Reliability";
+  if (r.includes("performance") || /local load|flow condition|balance range|cooling range|drag range/.test(r)) return "Performance";
+  return "Other";
 };
+// repeated table headers (when a team's table runs onto another page) and page footers
+const NOISE = /©|All Rights Reserved|Highly Confidential|^\s*(Updated|component|Primary reason|for update|update)\b|Geometric differences compared|Brief description on how|previous version|\(min 20, max 100 words\)|^\s*Page \d+/i;
 
 export function parseCarPresentation(text) {
   const lines = text.split("\n");
@@ -54,6 +56,7 @@ export function parseCarPresentation(text) {
     if (!cur) continue;
     if (!cur.header && /Updated/.test(line) && /Primary/.test(line)) { cur.header = chunks(line); continue; }
     if (cur.header && /^\s*component\b/i.test(line)) continue; // second header line
+    if (NOISE.test(line)) continue;
     cur.lines.push(line);
   }
   return teams.map((t) => {
