@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undercut — live timing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">UNDERCUT</div>
+    <div class="session">
+      <div class="session-name" id="sessionName">Waiting for data…</div>
+      <div class="muted small" id="sessionSub"></div>
+    </div>
+    <div class="lap" id="lap"></div>
+    <div class="chip" id="track"></div>
+    <div class="mono muted" id="clock"></div>
+    <div class="mono muted small" id="weather"></div>
+    <div class="spacer"></div>
+    <div class="conn" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></div>
+  </header>
+
+  <section class="card strip" id="stripCard" hidden>
+    <div class="lapstrip" id="lapStrip"></div>
+  </section>
+
+  <main class="grid">
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Timing</h2>
+        <div class="legend">
+          <span><i class="sw p"></i>Fastest overall</span>
+          <span><i class="sw g"></i>Personal best</span>
+          <span><i class="sw y"></i>Slower</span>
+          <span><i class="sw b"></i>Pit lane</span>
+        </div>
+      </div>
+      <div class="scroll">
+        <table class="timing">
+          <thead>
+            <tr>
+              <th class="r">P</th><th></th><th>DRV</th><th class="r">GAP</th><th class="r">INT</th>
+              <th class="r">LAST</th><th class="r">BEST</th><th>S1</th><th>S2</th><th>S3</th>
+              <th class="r">KM/H</th><th>TYRE</th><th class="r">STOPS</th>
+            </tr>
+          </thead>
+          <tbody id="rows"><tr><td colspan="13" class="muted empty">No timing yet — data starts flowing shortly before the session.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <h2>Battles</h2>
+        <div id="battles" class="battles"><div class="muted small">Nobody within a second of the car ahead right now.</div></div>
+      </section>
+      <section class="card">
+        <h2>What just happened</h2>
+        <div id="story" class="feed"><div class="muted small">Pit stops, overtakes, fastest laps and safety cars will show up here.</div></div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>Race control</h2>
+          <div class="filters" id="rcFilters">
+            <button data-f="all" class="on">All</button>
+            <button data-f="flag">Flags</button>
+            <button data-f="penalty">Penalties</button>
+            <button data-f="investigation">Investigations</button>
+            <button data-f="limits">Track limits</button>
+          </div>
+        </div>
+        <div id="rcm" class="feed"></div>
+      </section>
+    </aside>
+  </main>
+  <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "undercut",
+  "version": "0.2.0",
+  "description": "F1 live timing that explains the race. Unofficial, not associated with Formula 1.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "replay": "node server.js --replay",
+    "live": "node capture.js",
+    "terminal-replay": "node capture.js --replay"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.7",
+    "ws": "^8.18.0"
+  }
+}
