@@ -1,12 +1,13 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv3va7yn";
-import { Race, lapSeconds } from "./lib/race.js?v=mv3va7yn";
-import { CircleView } from "./circle.js?v=mv3va7yn";
-import { renderTyres } from "./tyres.js?v=mv3va7yn";
-import { renderStrategy } from "./strategy.js?v=mv3va7yn";
-import { renderCompare } from "./compare.js?v=mv3va7yn";
-import { renderRewind } from "./rewind.js?v=mv3va7yn";
-import { renderDriver } from "./driver.js?v=mv3va7yn";
+import { LiveState } from "./lib/state.js?v=mv3vszxu";
+import { Race, lapSeconds } from "./lib/race.js?v=mv3vszxu";
+import { CircleView } from "./circle.js?v=mv3vszxu";
+import { renderTyres } from "./tyres.js?v=mv3vszxu";
+import { renderStrategy } from "./strategy.js?v=mv3vszxu";
+import { renderCompare } from "./compare.js?v=mv3vszxu";
+import { renderRewind } from "./rewind.js?v=mv3vszxu";
+import { renderDriver } from "./driver.js?v=mv3vszxu";
+import { Player, parseRecording } from "./player.js?v=mv3vszxu";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -109,39 +110,145 @@ function connectDirect() {
   };
 }
 
-// Replay a recording file (from npm start or the capture script) right here in the page.
-async function replayFile(file, speed) {
+// ---------- replays ----------
+// Recordings (ours, or archived sessions) play through the same engine as live data.
+let player = null;
+function stopLive() {
   useServer = false;
   serverSocket?.close();
   const ds = directSocket;
   directSocket = null;
   ds?.close();
-  newEngine("replay", `Replaying ${file.name}`);
-  const myEngine = engine;
-  let simNow = null;
-  engine.race.now = () => simNow ?? Date.now();
-  const lines = (await file.text()).split("\n");
-  let prevT = null;
-  for (const line of lines) {
-    if (engine !== myEngine) return; // another file was loaded
-    if (!line.trim()) continue;
-    let msg;
-    try { msg = JSON.parse(line); } catch { continue; }
-    const t = Date.parse(msg.t);
-    if (prevT !== null && t > prevT) await new Promise((r) => setTimeout(r, Math.min(3000, (t - prevT) / speed())));
-    prevT = t;
-    if (Number.isFinite(t)) simNow = t;
-    engine.replayTime = msg.t;
-    if (msg.snapshot) for (const [k, d] of Object.entries(msg.snapshot)) feed(k, d);
-    else if (msg.topic) feed(msg.topic, msg.data);
-  }
-  engine.status = "Replay finished";
+}
+function ensurePlayer() {
+  player ??= new Player({
+    reset: () => { newEngine("replay", `Replay · ${player.name}`); engine.race.now = () => player.now; },
+    apply: (topic, data) => feed(topic, data),
+    onChange: () => drawPlayer(),
+  });
+  return player;
+}
+function startReplay(lines, name) {
+  if (!lines.length) { alert("That file doesn't contain any timing data."); return; }
+  stopLive();
+  const p = ensurePlayer();
+  p.speed = Number($("recSpeed").value) || 1;
+  p.load(lines, name);
+  $("player").hidden = false;
+  lastMarks = "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-$("recFile").addEventListener("change", (e) => {
+$("recFile").addEventListener("change", async (e) => {
   const f = e.target.files?.[0];
-  if (f) replayFile(f, () => Number($("recSpeed").value) || 1);
   e.target.value = "";
+  if (f) startReplay(parseRecording(await f.text()), f.name);
+});
+
+const clock = (ms) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+};
+let lastMarks = "";
+function drawPlayer() {
+  const p = player;
+  if (!p || !p.lines.length) return;
+  if (engine) engine.replayTime = new Date(p.now).toISOString();
+  const span = Math.max(1, p.end - p.first);
+  const frac = (p.now - p.first) / span;
+  $("plPlay").textContent = p.playing ? "Pause" : p.idx >= p.lines.length ? "Replay ended" : "Play";
+  $("plPlay").setAttribute("aria-pressed", p.playing ? "true" : "false");
+  const base = p.start ?? p.first;
+  const lap = p.lapAt(p.now);
+  $("plTime").textContent = `${lap ? `Lap ${lap} · ` : ""}${p.now < base ? "−" + clock(base - p.now) : clock(p.now - base)} ${p.start ? "since lights out" : "in"}`;
+  $("plName").textContent = p.name;
+  if (document.activeElement !== $("plSeek")) $("plSeek").value = String(Math.round(frac * 1000));
+  const shield = $("plShield").checked;
+  $("plTrack").style.setProperty("--done", `${(frac * 100).toFixed(2)}%`);
+  $("plTrack").classList.toggle("shielded", shield);
+  // markers: with the spoiler shield on, only show what's already happened
+  const key = `${shield}|${shield ? p.marks.filter((m) => m.ms <= p.now).length : "all"}|${p.name}`;
+  if (key !== lastMarks) {
+    lastMarks = key;
+    $("plMarks").innerHTML = p.marks.filter((m) => !shield || m.ms <= p.now)
+      .map((m) => `<button class="mark ${m.kind}" style="left:${(((m.ms - p.first) / span) * 100).toFixed(2)}%" data-ms="${m.ms}" title="${m.label} — jump here" aria-label="${m.label}"></button>`).join("");
+  }
+}
+
+$("plPlay").addEventListener("click", () => player?.toggle());
+$("plSeek").addEventListener("input", (e) => { if (player) player.seek(player.first + (Number(e.target.value) / 1000) * (player.end - player.first)); });
+$("plMarks").addEventListener("click", (e) => { const m = e.target.closest("[data-ms]"); if (m && player) player.seek(Number(m.dataset.ms) - 5000); });
+$("plBack").addEventListener("click", () => player?.seek(player.now - 10000));
+$("plFwd").addEventListener("click", () => player?.seek(player.now + 10000));
+$("plMinus").addEventListener("click", () => player?.seek(player.now - 1000));
+$("plPlus").addEventListener("click", () => player?.seek(player.now + 1000));
+$("plShield").addEventListener("change", () => { lastMarks = ""; drawPlayer(); });
+$("plSync").addEventListener("click", () => {
+  if (!player) return;
+  // you press this the moment the lights go out on your stream
+  $("recSpeed").value = "1";
+  player.speed = 1;
+  player.seek(player.start ?? player.first);
+  if (!player.playing) player.toggle();
+});
+$("plLive").addEventListener("click", () => { location.href = location.pathname + location.search; });
+$("recSpeed").addEventListener("change", (e) => { if (player) player.speed = Number(e.target.value) || 1; });
+
+// Past sessions archived by the GitHub job
+let archive = null;
+async function loadArchive() {
+  if (archive) return archive;
+  try {
+    const r = await fetch(`data/sessions/index.json?t=${Date.now()}`);
+    archive = r.ok ? await r.json() : { sessions: [] };
+  } catch { archive = { sessions: [] }; }
+  return archive;
+}
+async function renderReplays() {
+  const box = $("tab-replays");
+  const a = await loadArchive();
+  const fmtDate = (iso) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  const groups = new Map();
+  for (const s of a.sessions) {
+    const k = `${s.year}-${s.meeting}`;
+    if (!groups.has(k)) groups.set(k, { title: s.meeting, items: [] });
+    groups.get(k).items.push(s);
+  }
+  const list = [...groups.values()].map((g) => `<section class="card">
+      <h2>${esc(g.title)}</h2>
+      ${g.items.map((s) => `<div class="rp-item">
+        <div class="rp-main"><div class="rp-name">${esc(s.name)}</div><div class="muted small">${fmtDate(s.startUtc)} · ${s.sizeKb} KB</div></div>
+        <div class="rp-worth" title="How exciting it was — no results given away"><span class="dots">${"●".repeat(s.score)}${"○".repeat(5 - s.score)}</span><span class="small muted">${esc((s.reasons ?? []).join(", "))}</span></div>
+        <button class="btn primary" data-file="${esc(s.file)}" data-name="${esc(`${s.meeting} ${s.name}`)}">Watch</button>
+      </div>`).join("")}
+    </section>`).join("");
+  box.innerHTML = `<section class="card rp-intro">
+      <h2>Replays</h2>
+      <p class="muted small">Every race, sprint and qualifying is saved here about an hour after it ends. Results stay hidden — the dots only tell you how exciting it was. Press <b>Lights out — sync now</b> when the race starts on your stream and the timing follows your video.</p>
+      <label class="btn">Open a recording file…<input type="file" id="recFile2" accept=".jsonl,.json,.txt" hidden></label>
+    </section>
+    ${list || `<section class="card"><div class="muted small">No sessions archived yet — the archive job runs every hour, and OpenF1 only opens up once a live session has finished.</div></section>`}`;
+}
+$("tab-replays").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-file]");
+  if (!b) return;
+  b.disabled = true;
+  b.textContent = "Loading…";
+  try {
+    const r = await fetch(`data/sessions/${b.dataset.file}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const text = await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).text();
+    startReplay(parseRecording(text), b.dataset.name);
+    $("tabs").querySelector('[data-tab="overview"]').click();
+  } catch (err) {
+    b.textContent = "Couldn't load";
+    console.warn(err);
+  }
+});
+$("tab-replays").addEventListener("change", async (e) => {
+  if (e.target.id !== "recFile2") return;
+  const f = e.target.files?.[0];
+  if (f) { startReplay(parseRecording(await f.text()), f.name); $("tabs").querySelector('[data-tab="overview"]').click(); }
 });
 
 function render() {
@@ -185,7 +292,7 @@ function drawSlow(v) {
 // Clock for the circle: the data's own time, carried forward smoothly between updates.
 let clockBase = { now: Date.now(), at: Date.now() };
 function circleNow() {
-  const rate = view?.mode === "replay" ? (Number($("recSpeed").value) || 1) : 1;
+  const rate = view?.mode === "replay" ? (player?.playing ? player.speed : 0) : 1;
   return clockBase.now + (Date.now() - clockBase.at) * rate;
 }
 
@@ -353,7 +460,7 @@ $("rcFilters").addEventListener("click", (e) => {
 // ---------- team radio ----------
 // One shared audio player. The list is only rebuilt when a new clip arrives, so the
 // play buttons don't get swapped out from under your mouse.
-const player = new Audio();
+const radioPlayer = new Audio();
 let playing = null;
 let radioKey = "";
 let heard = new Set();
@@ -381,12 +488,12 @@ function handleRadio(v) {
 
 function play(url) {
   heard.add(url);
-  if (playing === url) { player.pause(); playing = null; }
-  else { player.src = url; player.play().catch(() => { playing = null; radioKey = ""; if (view) handleRadio(view); }); playing = url; }
+  if (playing === url) { radioPlayer.pause(); playing = null; }
+  else { radioPlayer.src = url; radioPlayer.play().catch(() => { playing = null; radioKey = ""; if (view) handleRadio(view); }); playing = url; }
   radioKey = "";
   if (view) handleRadio(view);
 }
-player.addEventListener("ended", () => { playing = null; radioKey = ""; if (view) handleRadio(view); });
+radioPlayer.addEventListener("ended", () => { playing = null; radioKey = ""; if (view) handleRadio(view); });
 $("radio").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-url]");
   if (b) play(b.dataset.url);
@@ -429,7 +536,8 @@ $("tabs").addEventListener("click", (e) => {
   if (!b) return;
   tab = b.dataset.tab;
   for (const x of $("tabs").children) x.classList.toggle("on", x === b);
-  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver"]) $(`tab-${t}`).hidden = t !== tab;
+  for (const t of ["overview", "circle", "tyres", "strategy", "compare", "rewind", "driver", "replays"]) $(`tab-${t}`).hidden = t !== tab;
+  if (tab === "replays") renderReplays();
   lastStrategy = 0;
   lastSlow = 0;
   if (tab === "circle") circleView.start(); else circleView.stop();

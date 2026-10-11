@@ -6,7 +6,7 @@
 <title>Undercut — live timing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=mv3va7yn">
+<link rel="stylesheet" href="style.css?v=mv3vszxu">
 </head>
 <body>
 <div class="wrap">
@@ -24,13 +24,33 @@
     <div class="conn" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></div>
     <div class="rec">
       <label class="btn">Load recording<input type="file" id="recFile" accept=".jsonl,.json,.txt" hidden></label>
-      <label class="sr" for="recSpeed">Replay speed</label>
-      <select id="recSpeed" title="Replay speed"><option value="1">1×</option><option value="5">5×</option><option value="20">20×</option><option value="60">60×</option></select>
     </div>
   </header>
 
   <section class="card strip" id="stripCard" hidden>
     <div class="lapstrip" id="lapStrip"></div>
+  </section>
+
+  <section class="card player" id="player" hidden>
+    <div class="pl-row">
+      <button class="btn primary" id="plPlay" aria-pressed="true">Pause</button>
+      <button class="btn" id="plBack" aria-label="Back 10 seconds">−10s</button>
+      <button class="btn" id="plFwd" aria-label="Forward 10 seconds">+10s</button>
+      <label class="sr" for="recSpeed">Replay speed</label>
+      <select id="recSpeed" title="Replay speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="20">20×</option><option value="60">60×</option></select>
+      <div class="pl-info"><div class="pl-time mono" id="plTime"></div><div class="muted small" id="plName"></div></div>
+      <div class="spacer"></div>
+      <button class="btn sync" id="plSync">Lights out — sync now</button>
+      <button class="btn" id="plMinus" aria-label="Timing 1 second earlier">−1s</button>
+      <button class="btn" id="plPlus" aria-label="Timing 1 second later">+1s</button>
+      <label class="muted small shield"><input type="checkbox" id="plShield" checked> Spoiler shield</label>
+      <button class="btn" id="plLive">Back to live</button>
+    </div>
+    <div class="pl-track" id="plTrack">
+      <label class="sr" for="plSeek">Replay position</label>
+      <input type="range" id="plSeek" min="0" max="1000" value="0">
+      <div class="pl-marks" id="plMarks"></div>
+    </div>
   </section>
 
   <nav class="tabs" id="tabs" aria-label="Views">
@@ -41,6 +61,7 @@
     <button data-tab="compare">Compare</button>
     <button data-tab="rewind">Rewind</button>
     <button data-tab="driver">My driver</button>
+    <button data-tab="replays">Replays</button>
   </nav>
 
   <section class="card" id="tab-circle" hidden>
@@ -65,6 +86,7 @@
   <div id="tab-compare" class="stack" hidden></div>
   <div id="tab-rewind" class="stack" hidden></div>
   <div id="tab-driver" hidden></div>
+  <div id="tab-replays" class="stack" hidden></div>
 
   <main class="grid" id="tab-overview">
     <section class="card table-card">
@@ -128,6 +150,6 @@
   </main>
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
-<script type="module" src="app.js?v=mv3va7yn"></script>
+<script type="module" src="app.js?v=mv3vszxu"></script>
 </body>
 </html>

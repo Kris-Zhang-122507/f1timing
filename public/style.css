@@ -250,3 +250,29 @@ h2 .chip { font-size: 11px; padding: 3px 8px; vertical-align: middle; margin-lef
 .dv-val { font: 600 22px "JetBrains Mono", monospace; }
 .dv-call { font: 700 40px "Barlow Condensed", sans-serif; color: var(--accent); }
 .dv-radio { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* replay player */
+.btn.primary { background: var(--accent); color: #1A1204; border-color: var(--accent); }
+.btn.primary:hover { color: #1A1204; filter: brightness(1.08); }
+.btn.sync { border-color: var(--accent); color: var(--accent-soft); }
+.btn:disabled { opacity: 0.6; cursor: default; }
+.player { gap: 12px; border: 1px solid #3A2A0A; }
+.pl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pl-row select { min-height: 36px; background: var(--card2); color: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
+.pl-info { display: flex; flex-direction: column; margin-left: 6px; }
+.pl-time { font-size: 15px; }
+.shield { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.pl-track { position: relative; padding-top: 14px; --done: 0%; }
+.pl-track input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+.pl-track.shielded::after { content: "future hidden"; position: absolute; right: 0; top: -2px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.pl-marks { position: absolute; left: 0; right: 0; top: 0; height: 12px; }
+.mark { position: absolute; top: 0; width: 10px; height: 10px; margin-left: -5px; border-radius: 2px; border: 0; padding: 0; cursor: pointer; background: #6B7383; }
+.mark.sc { background: var(--accent); } .mark.red { background: #FF4D4D; } .mark.pit { background: #8B6CC9; width: 6px; margin-left: -3px; }
+
+/* replays list */
+.rp-item { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 10px 0; border-top: 1px solid var(--line2); }
+.rp-item:first-of-type { border-top: 0; }
+.rp-main { flex: 1 1 200px; }
+.rp-name { font: 600 18px "Barlow Condensed", sans-serif; }
+.rp-worth { display: flex; flex-direction: column; gap: 2px; flex: 2 1 260px; }
+.rp-worth .dots { color: var(--accent); letter-spacing: 0.2em; font-size: 15px; }
