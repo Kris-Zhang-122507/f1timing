@@ -1,21 +1,22 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4kd7kf";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4kd7kf";
-import { CircleView } from "./circle.js?v=mv4kd7kf";
-import { renderTyres } from "./tyres.js?v=mv4kd7kf";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4kd7kf";
-import { renderCompare } from "./compare.js?v=mv4kd7kf";
-import { renderRewind } from "./rewind.js?v=mv4kd7kf";
-import { renderDriver } from "./driver.js?v=mv4kd7kf";
-import { Player, parseRecording } from "./player.js?v=mv4kd7kf";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4kd7kf";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4kd7kf";
-import { Dashboard } from "./dash.js?v=mv4kd7kf";
-import { CarTelemetry } from "./telemetry.js?v=mv4kd7kf";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4kd7kf";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4kd7kf";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4kd7kf";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4kd7kf";
+import { LiveState } from "./lib/state.js?v=mv4kitnd";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4kitnd";
+import { CircleView } from "./circle.js?v=mv4kitnd";
+import { renderTyres } from "./tyres.js?v=mv4kitnd";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4kitnd";
+import { renderCompare } from "./compare.js?v=mv4kitnd";
+import { renderRewind } from "./rewind.js?v=mv4kitnd";
+import { renderDriver } from "./driver.js?v=mv4kitnd";
+import { Player, parseRecording } from "./player.js?v=mv4kitnd";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4kitnd";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4kitnd";
+import { Dashboard } from "./dash.js?v=mv4kitnd";
+import { CarTelemetry } from "./telemetry.js?v=mv4kitnd";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4kitnd";
+import * as tx from "./transcribe.js?v=mv4kitnd";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4kitnd";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4kitnd";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4kitnd";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -765,7 +766,10 @@ function handleRadio(v) {
   if (!radioPrimed && clips.length) { for (const c of clips) heard.add(c.url); radioPrimed = true; }
   const fresh = clips.filter((c) => !heard.has(c.url));
   if (fresh.length && $("radioAuto").checked && !playing) play(fresh[fresh.length - 1].url);
-  const key = clips.map((c) => c.url).join("|") + (playing ?? "");
+  // transcripts: with "Transcribe" on, every clip on screen gets one (newest first)
+  const txOn = $("radioText").checked;
+  if (txOn) for (const c of [...clips].reverse()) if (!tx.transcriptOf(c.url) && !tx.stateOf(c.url)) tx.transcribe(c.url);
+  const key = clips.map((c) => c.url).join("|") + (playing ?? "") + `|${txOn}|${txVersion}`;
   if (key === radioKey || tab !== "overview") return;
   radioKey = key;
   $("radio").innerHTML = clips.length ? clips.map((c) => `<div class="radio-item ${heard.has(c.url) ? "" : "new"}">
@@ -773,10 +777,30 @@ function handleRadio(v) {
     <div>
       <div class="who"><i style="background:${esc(c.colour)}"></i>${esc(c.tla)}</div>
       <div class="meta">${c.lap ? "L" + c.lap + " · " : ""}${esc(c.t)} UTC</div>
+      ${txOn || tx.transcriptOf(c.url) ? `<div class="tx">${txLine(c.url)}</div>` : ""}
     </div>
   </div>`).join("") : `<div class="muted small">No team radio yet this session.</div>`;
+  if (txOn && tx.status.state === "loading") $("radio").insertAdjacentHTML("afterbegin", `<div class="tx-model muted small">Downloading the speech model once (about 80 MB) — ${Math.round(tx.status.progress * 100)}%</div>`);
+  if (txOn && tx.status.state === "error") $("radio").insertAdjacentHTML("afterbegin", `<div class="tx-model small">Couldn't load the speech model: ${esc(tx.status.error)}</div>`);
 }
 
+let txVersion = 0;
+tx.onChange(() => { txVersion++; if (view) handleRadio(view); });
+function txLine(url) {
+  const t = tx.transcriptOf(url);
+  if (t) return `“${esc(t)}”`;
+  const st = tx.stateOf(url);
+  if (st === "working") return `<span class="muted">transcribing…</span>`;
+  if (st === "queued") return `<span class="muted">waiting to transcribe…</span>`;
+  if (st) return `<span class="muted">${esc(st)}</span>`;
+  return "";
+}
+try { $("radioText").checked = localStorage.getItem("undercut.radioText") === "1"; } catch {}
+$("radioText").addEventListener("change", (e) => {
+  try { localStorage.setItem("undercut.radioText", e.target.checked ? "1" : "0"); } catch {}
+  radioKey = "";
+  if (view) handleRadio(view);
+});
 function play(url) {
   heard.add(url);
   if (playing === url) { radioPlayer.pause(); playing = null; }

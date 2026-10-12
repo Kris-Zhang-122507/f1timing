@@ -573,3 +573,5 @@ td.pu.total { background: #1A1E27; }
 .pl-lap { display: flex; align-items: center; gap: 6px; }
 .pl-lap input { width: 56px; }
 .tabs .delay .menu-list { right: auto; left: 0; }
+.radio-item .tx { font-size: 13px; color: var(--soft); margin-top: 3px; line-height: 1.35; }
+.tx-model { padding: 6px 8px; background: #161A22; border-radius: 4px; margin-bottom: 6px; }
