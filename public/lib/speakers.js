@@ -60,13 +60,14 @@ export function textScore(text, fullName = "") {
   s += Math.min(2.5, info.filter((re) => re.test(t)).length);
   const noThanks = t.replace(/\bthank you\b/g, "");
   if (/\byou('re| are|'ve| have|'ll| will| need| can| did| got)\b|\byour\b/.test(noThanks)) s += 1;
-  if (has(/\bwell done\b|\bgreat (job|drive|work|stuff)\b|\bgood (job|work|stuff)\b|\bnice (job|work)\b|\bfantastic\b|\bbrilliant\b|\bmega\b|\bwhat a (drive|job|race)\b|\bproud of you\b/)) s += 1.5;
+  if (has(/\bwell (done|driven|drove)\b|\bgreat (job|drive|work|stuff)\b|\bgood (job|work|stuff)\b|\bnice (job|work)\b|\bfantastic\b|\bbrilliant\b|\bmega\b|\bwhat a (drive|job|race)\b|\bproud of you\b/)) s += 1.5;
   if (has(/\bmate\b/)) s += 0.5;
   if (has(/\bwe('re| are|'ll| will| have| need| can)\b/)) s += 0.5;
   // driver talk
   if (has(/\bi\b|\bi'm\b|\bi've\b|\bi'll\b|\bi'd\b|\bmy\b|\bme\b/)) s -= 1.5;
   if (has(/\bguys\b/)) s -= 1.5;
-  if (has(/\bthank you\b|\bthanks\b/)) s -= 0.5;
+  if (has(/\bthank (you|u),? (everyone|everybody|all|team|so much,? (guys|everyone))\b|\bthanks,? (everyone|everybody|all|team)\b/)) s -= 1.5;
+  else if (has(/\bthank you\b|\bthanks\b/)) s -= 0.5;
   if (has(/\bthe car\b|\btyres? (are|is) (gone|dead|done|finished|cold|graining)\b|\bno grip\b|\bunder ?steer|\bover ?steer|\bthe (rears?|fronts?)\b|\bblue flags?\b|\bhe (pushed|hit|forced|crashed|moved|blocked|went|just)\b|\bhe's\b|\bdangerous\b|\bunbelievable\b|\bridiculous\b|\bwhat (was|is) that\b|\bno power\b|\bengine\b|\bgearbox\b|\bpuncture\b|\bi lost\b/)) s -= 1;
   if (has(/\b(come on|let's go|lets go|get in there|vamos|allez|forza)\b|\by+e+s+!|\bwoo+\b|\bwoohoo\b/)) s -= 1.5;
   if (has(/\bf[*u]+c?k|\bf\*+|\bshit\b|\bdamn\b|\bbloody\b/)) s -= 1;
@@ -110,33 +111,40 @@ function fftPower(frame) {
   return p;
 }
 
-// the fingerprint of a stretch of audio: average spectrum shape (dB) of its loudest frames
-// (where someone's talking), with overall loudness taken out
+// the fingerprint of a stretch of audio: the average spectrum shape (dB) of its loudest frames
+// (where someone's talking) with overall loudness taken out, plus how loud the talking is and
+// how loud the background is between words. Each mic has its own level and its own hiss/hum.
 export function voiceprint(audio, from, to) {
   const a = Math.max(0, Math.floor(from * SR)), b = Math.min(audio.length, Math.ceil(to * SR));
   const frames = [];
   for (let i = a; i + N <= b; i += HOP) {
     const p = fftPower(audio.subarray(i, i + N));
+    let total = 1e-10;
     const bands = BANK.map(([l, c, h]) => {
       let e = 1e-10;
       for (let k = Math.ceil(l); k <= Math.floor(h); k++) e += p[k] * (k <= c ? (k - l) / (c - l || 1) : (h - k) / (h - c || 1));
+      total += e;
       return 10 * Math.log10(e);
     });
-    frames.push({ e: bands.reduce((x, y) => x + y, 0), bands });
+    frames.push({ e: 10 * Math.log10(total), bands });
   }
   if (frames.length < 4) return null;
   frames.sort((x, y) => y.e - x.e);
   const voiced = frames.slice(0, Math.max(3, Math.ceil(frames.length * 0.4)));
   const v = Array.from({ length: BANDS }, (_, k) => voiced.reduce((acc, f) => acc + f.bands[k], 0) / voiced.length);
   const m = v.reduce((x, y) => x + y, 0) / BANDS;
-  return v.map((x) => x - m);
+  return { shape: v.map((x) => x - m), level: voiced.reduce((acc, f) => acc + f.e, 0) / voiced.length, floor: frames[Math.floor(frames.length * 0.85)].e };
 }
+
+// how different two stretches sound (roughly dB): spectrum shape, talking level, background level
+export const voiceGap = (x, y) => Math.sqrt(x.shape.reduce((acc, xi, i) => acc + (xi - y.shape[i]) ** 2, 0) / BANDS) * 2 + Math.abs(x.level - y.level) * 0.5 + Math.abs(x.floor - y.floor) * 0.35;
 
 const dist = (x, y) => Math.sqrt(x.reduce((acc, xi, i) => acc + (xi - y[i]) ** 2, 0));
 const mean = (vs) => vs[0].map((_, k) => vs.reduce((acc, v) => acc + v[k], 0) / vs.length);
 
 // two groups by voice; sep = how far apart the groups are compared with how spread out each is
-function twoVoices(prints) {
+function twoVoices(fps) {
+  const prints = fps.map((p) => (p ? [...p.shape, p.level * 0.5, p.floor * 0.35] : null));
   const idx = prints.map((p, i) => (p ? i : -1)).filter((i) => i >= 0);
   if (idx.length < 2) return null;
   let sa = idx[0], sb = idx[1], best = -1;
@@ -153,50 +161,79 @@ function twoVoices(prints) {
 }
 
 // ---------------- together ----------------
-const SURE = 1.5;   // text score needed to call a sentence on its words alone
-const APART = 2.2;  // voice groups this far apart are taken to be two different people
-export function label(segs, audio, fullName = "") {
-  const sents = sentences(segs);
-  const score = sents.map((x) => textScore(x.text, fullName));
-  const byText = score.map((s) => (s >= SURE ? "Team" : s <= -SURE ? "Driver" : null));
-  const prints = audio ? sents.map((x) => voiceprint(audio, x.from, x.to)) : [];
-  const voices = audio ? twoVoices(prints) : null;
-  let who = byText.slice();
+// A clip is a run of "turns", and the speaker swaps at each handover — there are only two people.
+// So: find the handovers, label the turns whose words are clear, and the turns in between take
+// the opposite of their neighbour.
+const SURE = 1.5;     // text score needed to call a sentence or turn on its words alone
+const SOUND = 4.5;    // how different (≈dB) two sentences must sound to count as a different mic
+const ACK = /^(copy|copy that|okay|ok|yeah|yes|yep|understood|roger|got it|thanks|thank you|cheers)\b/i;
 
-  if (voices) {
-    const g = voices.group;
-    const sum = [0, 0];
-    for (const [i, k] of g) sum[k] += score[i];
-    const tags = [new Set(), new Set()];
-    for (const [i, k] of g) if (byText[i]) tags[k].add(byText[i]);
-    const mixed = tags[0].size > 1 || tags[1].size > 1;
-    const same = !mixed && tags[0].size && tags[1].size && [...tags[0]][0] === [...tags[1]][0];
-    if (!mixed && !same && voices.sep >= APART && (tags[0].size || tags[1].size)) {
-      // two people, and the words tell us who's who: one group is the team, the other the driver
-      const teamGroup = sum[0] === sum[1] ? (tags[0].has("Team") || tags[1].has("Driver") ? 0 : 1) : sum[0] > sum[1] ? 0 : 1;
-      who = sents.map((_, i) => (g.has(i) ? (g.get(i) === teamGroup ? "Team" : "Driver") : byText[i]));
-      // a really clear sentence keeps its own label
-      who = who.map((w, i) => (Math.abs(score[i]) >= 3 ? byText[i] : w));
-    } else if (!mixed && (voices.sep < APART || same)) {
-      // sounds like one person: everyone gets the label the words agree on
-      const all = [...tags[0], ...tags[1]];
-      if (all.length && all.every((x) => x === all[0])) who = sents.map(() => all[0]);
+export function label(segs, audio, fullName = "", explain = false) {
+  const sents = sentences(segs);
+  const n = sents.length;
+  if (!n) return [];
+  const score = sents.map((x) => textScore(x.text, fullName));
+  const byText = score.map((v) => (v >= SURE ? "Team" : v <= -SURE ? "Driver" : null));
+  const prints = audio ? sents.map((x) => voiceprint(audio, x.from, x.to)) : sents.map(() => null);
+  const voices = audio ? twoVoices(prints) : null;
+  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  const names = first ? [first, ...(NICK[first] ?? [])] : [];
+  const startsWithName = (t) => names.some((nm) => new RegExp(`^\\W*${reEsc(nm)}\\b`, "i").test(t));
+
+  // evidence for a handover between sentence i and i + 1 (> 1 means yes)
+  const why = [];
+  const handover = [];
+  let turnStart = 0;
+  for (let i = 0; i + 1 < n; i++) {
+    let e = 0;
+    const notes = [];
+    // the new sentence against the whole turn so far (a single short sentence is a poor sample)
+    const a = audio ? voiceprint(audio, sents[turnStart].from, sents[i].to) : null, b = prints[i + 1];
+    if (a && b) {
+      const d = voiceGap(a, b), trust = Math.min(1, (sents[i + 1].to - sents[i + 1].from) / 1.5);
+      e += (trust * (d - SOUND)) / 2; notes.push(`sound ${d.toFixed(1)}${trust < 1 ? ` (short, ×${trust.toFixed(1)})` : ""}`);
     }
-  } else {
-    // no voice info: a clip where the words only ever point one way is one person talking
-    const all = byText.filter(Boolean);
-    if (all.length && all.every((x) => x === all[0]) && sents.length <= 3) who = sents.map(() => all[0]);
+    if (voices?.group.has(i) && voices.group.has(i + 1) && voices.sep >= 1.5) {
+      const differ = voices.group.get(i) !== voices.group.get(i + 1), w = Math.min(1.5, voices.sep / 3);
+      e += differ ? w : -w; notes.push(`${differ ? "voice groups differ" : "same voice group"} (${voices.sep.toFixed(1)})`);
+    }
+    const gap = sents[i + 1].from - sents[i].to;
+    if (gap >= 0.7) { e += gap >= 1.5 ? 0.8 : 0.4; notes.push(`pause ${gap.toFixed(1)}s`); }
+    const next = sents[i + 1].text.trim(), prev = sents[i].text.trim();
+    if (startsWithName(next) && !startsWithName(prev)) { e += 1; notes.push("starts with his name"); }
+    if (ACK.test(next) && !ACK.test(prev)) { e += 0.5; notes.push("reply word"); }
+    if (/\?\s*$/.test(prev)) { e += 0.6; notes.push("after a question"); }
+    if (byText[i] && byText[i + 1]) { e += byText[i] !== byText[i + 1] ? 3 : -3; notes.push(byText[i] !== byText[i + 1] ? "words disagree" : "words agree"); }
+    handover.push(e > 1);
+    if (e > 1) turnStart = i + 1;
+    why.push(`${i}|${i + 1}: ${e.toFixed(1)} (${notes.join(", ")})`);
   }
-  // a short reply with no clue ("Copy.") right after one side talked is usually the other side
-  for (let i = 1; i < sents.length; i++) {
-    if (!who[i] && who[i - 1] && /^(copy|copy that|okay|ok|yeah|yes|yep|understood|roger|got it|thanks|thank you)[.!]*$/i.test(sents[i].text.trim())) who[i] = who[i - 1] === "Team" ? "Driver" : "Team";
+
+  // turns
+  const turns = [[0]];
+  for (let i = 1; i < n; i++) { if (handover[i - 1]) turns.push([i]); else turns.at(-1).push(i); }
+  const tScore = turns.map((t) => t.reduce((acc, i) => acc + score[i], 0));
+  const tWho = tScore.map((v) => (v >= SURE ? "Team" : v <= -SURE ? "Driver" : null));
+  // fill in from neighbours, alternating, nearest clear turn first
+  for (let pass = 0; pass < turns.length; pass++) {
+    for (let k = 0; k < turns.length; k++) {
+      if (tWho[k]) continue;
+      const left = tWho[k - 1], right = tWho[k + 1];
+      if (left && right && left !== right) continue; // can't both be right — leave it
+      const from = left ?? right;
+      if (from) tWho[k] = from === "Team" ? "Driver" : "Team";
+    }
   }
+  const who = [];
+  turns.forEach((t, k) => { for (const i of t) who[i] = Math.abs(score[i]) >= 3 ? byText[i] : tWho[k] ?? byText[i]; });
+
   // join neighbouring sentences from the same speaker into one line
   const lines = [];
   sents.forEach((x, i) => {
     const last = lines.at(-1);
-    if (last && last.who === who[i]) last.text += ` ${x.text}`;
+    if (last && last.who === who[i] && !(i > 0 && handover[i - 1] && who[i] == null)) last.text += ` ${x.text}`;
     else lines.push({ who: who[i], text: x.text });
   });
+  if (explain) return { lines, why, score, turns, voices: voices && { sep: voices.sep } };
   return lines;
 }

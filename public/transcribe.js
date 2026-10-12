@@ -2,8 +2,8 @@
 // once (tools/radio-helper.js). F1's server doesn't let websites read its radio clips, so the
 // helper fetches each clip and transcribes it with Whisper on Cloudflare. The page then works out
 // which lines are the driver and which are the team (and you can click a tag to correct it).
-import { label } from "./lib/speakers.js?v=mv4zegnc";
-const KEY = "undercut.transcripts.v4";
+import { label } from "./lib/speakers.js?v=mv4zt3z3";
+const KEY = "undercut.transcripts.v5";
 const HELPER = "undercut.radioHelper";
 
 export const status = { error: null };
