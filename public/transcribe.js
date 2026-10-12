@@ -2,9 +2,9 @@
 // run by transformers.js). Nothing is uploaded anywhere: the model downloads once (~80 MB, then
 // cached by the browser) and each clip is transcribed on your computer.
 //
-// F1's server doesn't let other websites read its radio files directly, so there are two ways in:
-//   1. download the clip (works wherever F1 allows it)
-//   2. "listen": you share this tab's audio once, and each clip is recorded while it plays.
+// F1's server doesn't let other websites read its radio files, so clips are fetched through a
+// "radio helper": a tiny free Cloudflare Worker you set up once (tools/radio-helper.js), whose
+// address is saved in this browser. Without one, transcripts can't be made on a website.
 // Each line is labelled Driver or Team with a best guess: the driver's mic picks up engine and
 // wind noise, the pit wall is clean — so the noisier voice is taken to be the driver.
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js";
@@ -12,7 +12,17 @@ const MODEL = "Xenova/whisper-base.en";
 const KEY = "undercut.transcripts.v2";
 
 let asr = null, loading = null;
-export const status = { state: "idle", progress: 0, loaded: 0, total: 0, error: null, listening: false, blocked: false };
+export const status = { state: "idle", progress: 0, loaded: 0, total: 0, error: null, blocked: false };
+const HELPER = "undercut.radioHelper";
+export const helper = () => { try { return localStorage.getItem(HELPER) || ""; } catch { return ""; } };
+export function setHelper(addr) {
+  const a = String(addr ?? "").trim().replace(/\/+$/, "");
+  try { if (a) localStorage.setItem(HELPER, a); else localStorage.removeItem(HELPER); } catch {}
+  // try everything that was blocked again
+  status.blocked = false; status.error = null;
+  for (const [u, st] of pending) if (st === "blocked" || /^Couldn't/.test(st)) pending.delete(u);
+  changed();
+}
 const listeners = new Set();
 export const onChange = (fn) => listeners.add(fn);
 const changed = () => { for (const fn of listeners) fn(); };
@@ -58,7 +68,7 @@ async function model() {
 
 // ---------- the queue: clips we can download ----------
 const queue = [];
-const pending = new Map(); // url -> "queued" | "working" | "needs-listen" | error text
+const pending = new Map(); // url -> "queued" | "working" | "blocked" | error text
 export const stateOf = (url) => pending.get(url) ?? null;
 let busy = false;
 
@@ -66,7 +76,7 @@ export function transcribe(url, retry = false) {
   if (saved[url]) return;
   if (retry && pending.has(url) && pending.get(url) !== "working") pending.delete(url);
   if (pending.has(url)) return;
-  if (status.blocked) { pending.set(url, "needs-listen"); changed(); return; } // don't hammer a server that says no
+  if (status.blocked) { pending.set(url, "blocked"); changed(); return; } // don't hammer a server that says no
   pending.set(url, "queued");
   queue.unshift(url);
   changed();
@@ -82,11 +92,12 @@ async function run() {
       pending.set(url, "working"); changed();
       let audio;
       try { audio = await download(url); }
-      catch {
-        // F1 blocks this — fall back to listening while it plays
+      catch (e) {
+        // F1 (or the helper) said no: stop and explain, rather than trying every clip
         status.blocked = true;
-        pending.set(url, "needs-listen");
-        for (const u of queue.splice(0)) pending.set(u, "needs-listen");
+        status.error = helper() ? `The radio helper couldn't get the clip (${e.message}).` : null;
+        pending.set(url, "blocked");
+        for (const u of queue.splice(0)) pending.set(u, "blocked");
         changed();
         break;
       }
@@ -113,7 +124,8 @@ async function finish(url, audio) {
 }
 
 async function download(url) {
-  const r = await fetch(url, { mode: "cors" });
+  const h = helper();
+  const r = await fetch(h ? `${h}/?url=${encodeURIComponent(url)}` : url, { mode: "cors" });
   if (!r.ok) throw new Error(`clip HTTP ${r.status}`);
   return toSamples(await r.arrayBuffer());
 }
@@ -165,47 +177,4 @@ export function speakers(audio, chunks) {
   for (let i = 1; i < out.length; i++) if (!out[i].who) out[i].who = out[i - 1].who;
   // merge consecutive lines from the same speaker
   return out.reduce((acc, c) => { const last = acc.at(-1); if (last && last.who === c.who) last.text += ` ${c.text}`; else acc.push({ ...c }); return acc; }, []);
-}
-
-// ---------- listening: record this tab's audio while a clip plays ----------
-let tabStream = null;
-export async function startListening() {
-  if (tabStream) return true;
-  try {
-    const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude", systemAudio: "exclude" });
-    const audioTracks = s.getAudioTracks();
-    for (const t of s.getVideoTracks()) t.stop(); // only the sound is needed
-    if (!audioTracks.length) { status.error = "No sound was shared — choose this tab and tick “Also share tab audio”."; changed(); return false; }
-    tabStream = new MediaStream(audioTracks);
-    audioTracks[0].addEventListener("ended", () => { tabStream = null; status.listening = false; changed(); });
-    status.listening = true; status.error = null; changed();
-    return true;
-  } catch (e) {
-    status.error = /denied|not allowed|NotAllowed/i.test(e.message) ? "Sharing was cancelled." : `Couldn't listen: ${e.message}`;
-    changed();
-    return false;
-  }
-}
-export function stopListening() { for (const t of tabStream?.getTracks() ?? []) t.stop(); tabStream = null; status.listening = false; changed(); }
-
-// call when a clip starts playing; it's recorded until it ends, then transcribed
-export function captureClip(audioEl, url) {
-  if (!tabStream || saved[url] || ["working", "listening"].includes(pending.get(url))) return;
-  let rec;
-  try { rec = new MediaRecorder(tabStream); } catch { return; }
-  const parts = [];
-  rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
-  rec.onstop = async () => {
-    const played = audioEl.currentTime || 0, full = audioEl.duration || 0;
-    if (full && played < full * 0.9) { pending.set(url, "needs-listen"); changed(); return; } // stopped early: try again next time
-    try {
-      const audio = await toSamples(await new Blob(parts, { type: rec.mimeType }).arrayBuffer());
-      await finish(url, audio);
-    } catch (e) { pending.set(url, `Couldn't transcribe: ${e.message}`); changed(); }
-  };
-  const stop = () => { audioEl.removeEventListener("ended", stop); audioEl.removeEventListener("pause", stop); if (rec.state !== "inactive") rec.stop(); };
-  audioEl.addEventListener("ended", stop);
-  audioEl.addEventListener("pause", stop);
-  pending.set(url, "listening"); changed();
-  rec.start();
 }

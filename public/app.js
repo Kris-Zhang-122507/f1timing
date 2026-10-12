@@ -1,24 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4or1zu";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4or1zu";
-import { CircleView } from "./circle.js?v=mv4or1zu";
-import { renderTyres } from "./tyres.js?v=mv4or1zu";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4or1zu";
-import { renderCompare } from "./compare.js?v=mv4or1zu";
-import { renderRewind } from "./rewind.js?v=mv4or1zu";
-import { renderDriver } from "./driver.js?v=mv4or1zu";
-import { Player, parseRecording } from "./player.js?v=mv4or1zu";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4or1zu";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4or1zu";
-import { Dashboard } from "./dash.js?v=mv4or1zu";
-import { CarTelemetry } from "./telemetry.js?v=mv4or1zu";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4or1zu";
-import * as tx from "./transcribe.js?v=mv4or1zu";
-import { renderKnockout } from "./quali.js?v=mv4or1zu";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv4or1zu";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4or1zu";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4or1zu";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4or1zu";
+import { LiveState } from "./lib/state.js?v=mv4vc6yy";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4vc6yy";
+import { CircleView } from "./circle.js?v=mv4vc6yy";
+import { renderTyres } from "./tyres.js?v=mv4vc6yy";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4vc6yy";
+import { renderCompare } from "./compare.js?v=mv4vc6yy";
+import { renderRewind } from "./rewind.js?v=mv4vc6yy";
+import { renderDriver } from "./driver.js?v=mv4vc6yy";
+import { Player, parseRecording } from "./player.js?v=mv4vc6yy";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4vc6yy";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4vc6yy";
+import { Dashboard } from "./dash.js?v=mv4vc6yy";
+import { CarTelemetry } from "./telemetry.js?v=mv4vc6yy";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4vc6yy";
+import * as tx from "./transcribe.js?v=mv4vc6yy";
+import { renderKnockout } from "./quali.js?v=mv4vc6yy";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv4vc6yy";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4vc6yy";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4vc6yy";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4vc6yy";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -805,9 +805,8 @@ function txLine(url) {
   if (t) return (Array.isArray(t) ? t : [{ who: null, text: t }]).map((l) => `<div class="tx-line">${l.who ? `<span class="who-tag ${l.who === "Driver" ? "drv" : "team"}">${l.who === "Driver" ? "DRIVER" : "TEAM"}</span>` : ""}<span>${esc(l.text)}</span></div>`).join("");
   const st = tx.stateOf(url);
   if (st === "working") return `<span class="muted">transcribing…</span><div class="tx-busy"><i></i></div>`;
-  if (st === "listening") return `<span class="muted">listening…</span><div class="tx-busy"><i></i></div>`;
   if (st === "queued") return `<span class="muted">waiting to transcribe…</span>`;
-  if (st === "needs-listen") return tx.status.listening ? `<span class="muted">play it to transcribe it</span>` : "";
+  if (st === "blocked") return "";
   if (st) return `<span class="muted">${esc(st)}</span> <button class="linkbtn" data-tx="${esc(url)}">Try again</button>`;
   if (tx.status.state === "ready") return `<button class="linkbtn" data-tx="${esc(url)}">Transcribe</button>`;
   return "";
@@ -816,12 +815,12 @@ function txLine(url) {
 function txCard() {
   const s = tx.status;
   const mb = (b) => `${Math.round(b / 1e6)} MB`;
-  if (s.state === "ready" && s.blocked && !s.listening) return `<div class="tx-card small">
-      <div>F1's server won't let websites download its radio clips, so Undercut can <b>listen</b> instead: share this tab's sound once, and each clip is transcribed while it plays.</div>
+  if (s.state === "ready" && s.blocked) return `<div class="tx-card small">
+      <div>F1's server won't let websites read its radio clips, so transcripts need a free <b>radio helper</b> — a tiny Cloudflare Worker you set up once (about 5 minutes, no card needed). <a href="https://github.com/Kris-Zhang-122507/f1timing/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener">How to set it up</a></div>
       ${s.error ? `<div class="tx-err">${esc(s.error)}</div>` : ""}
-      <button class="btn primary" id="txListen">Let it listen to this tab</button>
-      <div class="muted">In the box that opens, pick this tab and make sure “Also share tab audio” is ticked. Chrome and Edge only.</div></div>`;
-  if (s.state === "ready" && s.listening) return `<div class="tx-card ok small"><div>Listening — play a clip (or turn on Auto-play) and it's transcribed as it plays. Keep the volume up.</div><button class="linkbtn" id="txStop">Stop listening</button></div>`;
+      <form class="tx-helper" id="txHelperForm"><label class="sr" for="txHelper">Radio helper address</label>
+        <input id="txHelper" placeholder="https://radio-helper.yourname.workers.dev" value="${esc(tx.helper())}" autocomplete="off">
+        <button class="btn primary" type="submit">Save</button></form></div>`;
   if (s.state === "ready") return `<div class="tx-card ok small">Speech model ready — new clips are transcribed automatically.</div>`;
   if (s.state === "loading") return `<div class="tx-card small"><div>Downloading the speech model${s.total ? ` — ${mb(s.loaded)} of ${mb(s.total)}` : "…"}</div>
       <div class="tx-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.progress * 100)}"><i style="width:${(s.progress * 100).toFixed(1)}%"></i></div>
@@ -833,11 +832,14 @@ function txCard() {
 }
 $("radioTx").addEventListener("click", (e) => {
   if (e.target.id === "txDownload") tx.loadModel();
-  if (e.target.id === "txListen") tx.startListening();
-  if (e.target.id === "txStop") tx.stopListening();
 });
-// while listening, every clip that plays is recorded and transcribed
-radioPlayer.addEventListener("playing", () => { if (playing && $("radioText").checked) tx.captureClip(radioPlayer, playing); });
+$("radioTx").addEventListener("submit", (e) => {
+  if (e.target.id !== "txHelperForm") return;
+  e.preventDefault();
+  tx.setHelper($("txHelper").value);
+  radioKey = "";
+  if (view) handleRadio(view);
+});
 // playback progress for the clip that's playing
 function updateRadioBar() {
   const bar = $("radioBar");
