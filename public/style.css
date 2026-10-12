@@ -578,6 +578,9 @@ td.pu.total { background: #1A1E27; }
 /* radio: transcripts + playback progress */
 .tx-card { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; margin-bottom: 8px; background: #161A22; border-radius: 6px; color: var(--soft); }
 .tx-card.ok { color: #6EE7A8; }
+.tx-gear { background: none; border: 0; color: var(--faint); cursor: pointer; padding: 4px; display: inline-flex; align-items: center; border-radius: 4px; }
+.tx-gear:hover { color: var(--text); background: #1C2029; }
+.tx-gear[hidden] { display: none; }
 .tx-card .btn { align-self: flex-start; min-height: 30px; }
 .tx-err { color: #FEB2B2; }
 .tx-prog, .rp-bar, .tx-busy { height: 6px; background: #232836; border-radius: 3px; overflow: hidden; }

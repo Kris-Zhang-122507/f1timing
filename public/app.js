@@ -1,24 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4zt3z3";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4zt3z3";
-import { CircleView } from "./circle.js?v=mv4zt3z3";
-import { renderTyres } from "./tyres.js?v=mv4zt3z3";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4zt3z3";
-import { renderCompare } from "./compare.js?v=mv4zt3z3";
-import { renderRewind } from "./rewind.js?v=mv4zt3z3";
-import { renderDriver } from "./driver.js?v=mv4zt3z3";
-import { Player, parseRecording } from "./player.js?v=mv4zt3z3";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4zt3z3";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4zt3z3";
-import { Dashboard } from "./dash.js?v=mv4zt3z3";
-import { CarTelemetry } from "./telemetry.js?v=mv4zt3z3";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4zt3z3";
-import * as tx from "./transcribe.js?v=mv4zt3z3";
-import { renderKnockout } from "./quali.js?v=mv4zt3z3";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv4zt3z3";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4zt3z3";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4zt3z3";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4zt3z3";
+import { LiveState } from "./lib/state.js?v=mv507aov";
+import { Race, lapSeconds } from "./lib/race.js?v=mv507aov";
+import { CircleView } from "./circle.js?v=mv507aov";
+import { renderTyres } from "./tyres.js?v=mv507aov";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv507aov";
+import { renderCompare } from "./compare.js?v=mv507aov";
+import { renderRewind } from "./rewind.js?v=mv507aov";
+import { renderDriver } from "./driver.js?v=mv507aov";
+import { Player, parseRecording } from "./player.js?v=mv507aov";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv507aov";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv507aov";
+import { Dashboard } from "./dash.js?v=mv507aov";
+import { CarTelemetry } from "./telemetry.js?v=mv507aov";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv507aov";
+import * as tx from "./transcribe.js?v=mv507aov";
+import { renderKnockout } from "./quali.js?v=mv507aov";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv507aov";
+import { loadStandings, renderStandings } from "./standings.js?v=mv507aov";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv507aov";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv507aov";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -797,6 +797,7 @@ tx.onChange(() => { txVersion++; drawTxCard(); if (view) handleRadio(view); });
 // drawn on its own so it shows even before any session data arrives
 let txCardHtml = "";
 function drawTxCard() {
+  $("txGear").hidden = !($("radioText").checked && tx.helper());
   const html = $("radioText").checked ? txCard() : "";
   if (html !== txCardHtml) { txCardHtml = html; $("radioTx").innerHTML = html; }
 }
@@ -815,9 +816,8 @@ function txLine(url) {
 // the card at the top of the radio panel: download the speech model, with a progress bar
 function txCard() {
   const h = tx.helper();
-  if (h && !txEditing) return `<div class="tx-card ok small"><div>Radio helper connected — new clips are written out as text, each line marked driver or team — a best guess from the words and the voices. Click a tag to fix it.</div>
-      ${tx.status.error ? `<div class="tx-err">${esc(tx.status.error)}</div>` : ""}
-      <button class="linkbtn" id="txEdit">Change helper address</button></div>`;
+  // connected: stay out of the way unless something's wrong (the gear brings the settings back)
+  if (h && !txEditing) return tx.status.error ? `<div class="tx-card small"><div class="tx-err">${esc(tx.status.error)}</div><button class="linkbtn" id="txEdit">Change helper address</button></div>` : "";
   return `<div class="tx-card small">
       <div>F1's server won't let websites read its radio clips, so transcripts come from your own free <b>radio helper</b> on Cloudflare — it fetches each clip and turns the speech into text. Set it up once, about 5 minutes, no card needed.</div>
       <a href="https://github.com/Kris-Zhang-122507/f1timing/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener"><b>How to set up the radio helper</b></a>
@@ -829,6 +829,7 @@ let txEditing = false;
 $("radioTx").addEventListener("click", (e) => {
   if (e.target.id === "txEdit") { txEditing = true; drawTxCard(); $("txHelper")?.focus(); }
 });
+$("txGear").addEventListener("click", () => { txEditing = !txEditing; txCardHtml = ""; drawTxCard(); if (txEditing) $("txHelper")?.focus(); });
 $("radioTx").addEventListener("submit", (e) => {
   if (e.target.id !== "txHelperForm") return;
   e.preventDefault();
