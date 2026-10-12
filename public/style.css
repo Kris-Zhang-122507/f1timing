@@ -615,3 +615,7 @@ td.pu.total { background: #1A1E27; }
 .h2h-win { color: var(--text); font-weight: 700; }
 .h2h-stat > .mono:not(.h2h-win) { color: var(--muted); }
 .h2h-rounds td.h2h-win { color: #6EE7A8; font-weight: 700; }
+.tx-line { display: flex; gap: 6px; align-items: baseline; margin-top: 2px; }
+.who-tag { flex: 0 0 auto; font: 700 9px "Barlow", sans-serif; letter-spacing: .08em; padding: 1px 5px; border-radius: 3px; }
+.who-tag.drv { background: #3A2A0A; color: var(--accent-soft); }
+.who-tag.team { background: #10283A; color: #90CDF4; }

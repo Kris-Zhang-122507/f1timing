@@ -1,12 +1,18 @@
 // Team radio transcripts, made in your own browser with Whisper (OpenAI's open speech model,
 // run by transformers.js). Nothing is uploaded anywhere: the model downloads once (~80 MB, then
 // cached by the browser) and each clip is transcribed on your computer.
+//
+// F1's server doesn't let other websites read its radio files directly, so there are two ways in:
+//   1. download the clip (works wherever F1 allows it)
+//   2. "listen": you share this tab's audio once, and each clip is recorded while it plays.
+// Each line is labelled Driver or Team with a best guess: the driver's mic picks up engine and
+// wind noise, the pit wall is clean — so the noisier voice is taken to be the driver.
 const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js";
 const MODEL = "Xenova/whisper-base.en";
-const KEY = "undercut.transcripts";
+const KEY = "undercut.transcripts.v2";
 
 let asr = null, loading = null;
-export const status = { state: "idle", progress: 0, loaded: 0, total: 0, error: null }; // idle | loading | ready | error
+export const status = { state: "idle", progress: 0, loaded: 0, total: 0, error: null, listening: false, blocked: false };
 const listeners = new Set();
 export const onChange = (fn) => listeners.add(fn);
 const changed = () => { for (const fn of listeners) fn(); };
@@ -18,16 +24,16 @@ const persist = () => {
   if (keys.length > 400) for (const k of keys.slice(0, keys.length - 400)) delete saved[k];
   try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {}
 };
+// [{ who: "Driver" | "Team" | null, text }]
 export const transcriptOf = (url) => saved[url] ?? null;
 
-// was the model downloaded before? (then it's in the browser's cache and loads quickly)
 export const downloadedBefore = () => { try { return localStorage.getItem(KEY + ".model") === "1"; } catch { return false; } };
 export const loadModel = () => model().catch(() => {});
 
 async function model() {
   if (asr) return asr;
   loading ??= (async () => {
-    status.state = "loading"; status.progress = 0; changed();
+    status.state = "loading"; status.progress = 0; status.error = null; changed();
     const { pipeline, env } = await import(LIB);
     env.allowLocalModels = false;
     const files = {};
@@ -43,16 +49,16 @@ async function model() {
       },
     });
     status.state = "ready"; changed();
-    setTimeout(run, 0);
     try { localStorage.setItem(KEY + ".model", "1"); } catch {}
+    setTimeout(run, 0);
     return asr;
   })().catch((e) => { status.state = "error"; status.error = e.message; loading = null; changed(); throw e; });
   return loading;
 }
 
-// clips are transcribed one at a time, newest first
+// ---------- the queue: clips we can download ----------
 const queue = [];
-const pending = new Map(); // url -> "queued" | "working" | error text
+const pending = new Map(); // url -> "queued" | "working" | "needs-listen" | error text
 export const stateOf = (url) => pending.get(url) ?? null;
 let busy = false;
 
@@ -60,6 +66,7 @@ export function transcribe(url, retry = false) {
   if (saved[url]) return;
   if (retry && pending.has(url) && pending.get(url) !== "working") pending.delete(url);
   if (pending.has(url)) return;
+  if (status.blocked) { pending.set(url, "needs-listen"); changed(); return; } // don't hammer a server that says no
   pending.set(url, "queued");
   queue.unshift(url);
   changed();
@@ -67,41 +74,138 @@ export function transcribe(url, retry = false) {
 }
 
 async function run() {
-  if (busy) return;
+  if (busy || status.state !== "ready") return;
   busy = true;
   try {
     while (queue.length) {
       const url = queue.shift();
       pending.set(url, "working"); changed();
-      try {
-        const audio = await decode(url);
-        const asr = await model();
-        const out = await asr(audio, { chunk_length_s: 30 });
-        saved[url] = (out?.text ?? "").trim() || "(no words picked up)";
-        persist();
-        pending.delete(url);
-      } catch (e) {
-        pending.set(url, /fetch|cors|network/i.test(e.message)
-          ? "Couldn't download this clip to transcribe it — F1's server may not allow it, or you're offline."
-          : `Couldn't transcribe: ${e.message}`);
+      let audio;
+      try { audio = await download(url); }
+      catch {
+        // F1 blocks this — fall back to listening while it plays
+        status.blocked = true;
+        pending.set(url, "needs-listen");
+        for (const u of queue.splice(0)) pending.set(u, "needs-listen");
+        changed();
+        break;
       }
-      changed();
+      await finish(url, audio);
     }
   } finally { busy = false; }
 }
 
-// the clip as 16 kHz mono samples, which is what Whisper expects
-async function decode(url) {
+async function finish(url, audio) {
+  pending.set(url, "working"); changed();
+  try {
+    const asr = await model();
+    const out = await asr(audio, { chunk_length_s: 30, return_timestamps: true });
+    const chunks = (out?.chunks?.length ? out.chunks : [{ text: out?.text ?? "", timestamp: [0, audio.length / 16000] }])
+      .map((c) => ({ text: String(c.text ?? "").trim(), from: c.timestamp?.[0] ?? 0, to: c.timestamp?.[1] ?? audio.length / 16000 }))
+      .filter((c) => c.text);
+    saved[url] = chunks.length ? speakers(audio, chunks) : [{ who: null, text: "(no words picked up)" }];
+    persist();
+    pending.delete(url);
+  } catch (e) {
+    pending.set(url, `Couldn't transcribe: ${e.message}`);
+  }
+  changed();
+}
+
+async function download(url) {
   const r = await fetch(url, { mode: "cors" });
   if (!r.ok) throw new Error(`clip HTTP ${r.status}`);
-  const buf = await r.arrayBuffer();
+  return toSamples(await r.arrayBuffer());
+}
+
+// 16 kHz mono samples, which is what Whisper expects
+async function toSamples(buf) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   const ctx = new Ctx({ sampleRate: 16000 });
   try {
     const decoded = await ctx.decodeAudioData(buf);
-    if (decoded.numberOfChannels === 1) return decoded.getChannelData(0);
+    if (decoded.numberOfChannels === 1) return decoded.getChannelData(0).slice();
     const a = decoded.getChannelData(0), b = decoded.getChannelData(1), mono = new Float32Array(a.length);
     for (let i = 0; i < a.length; i++) mono[i] = (a[i] + b[i]) / 2;
     return mono;
   } finally { ctx.close?.(); }
+}
+
+// ---------- driver or team? ----------
+// For each line: how loud the background is compared with the voice. The helmet mic carries
+// engine and wind noise between words, so the driver's lines have a much higher noise floor.
+export function speakers(audio, chunks) {
+  const frame = 400; // 25 ms
+  const snr = chunks.map((c) => {
+    const a = Math.max(0, Math.floor(c.from * 16000)), b = Math.min(audio.length, Math.ceil(c.to * 16000));
+    const rms = [];
+    for (let i = a; i + frame <= b; i += frame) {
+      let s = 0;
+      for (let j = i; j < i + frame; j++) s += audio[j] * audio[j];
+      rms.push(Math.sqrt(s / frame) + 1e-6);
+    }
+    if (rms.length < 6) return null;
+    rms.sort((x, y) => x - y);
+    const floor = rms[Math.floor(rms.length * 0.15)], peak = rms[Math.floor(rms.length * 0.9)];
+    return 20 * Math.log10(peak / floor);
+  });
+  const known = snr.filter((x) => x != null);
+  let label;
+  if (known.length >= 2 && Math.max(...known) - Math.min(...known) > 6) {
+    // two voices: split at the biggest gap; the noisier group is the driver
+    const sorted = [...known].sort((a, b) => a - b);
+    let cut = sorted[0], gap = -1;
+    for (let i = 1; i < sorted.length; i++) if (sorted[i] - sorted[i - 1] > gap) { gap = sorted[i] - sorted[i - 1]; cut = (sorted[i] + sorted[i - 1]) / 2; }
+    label = (x) => (x == null ? null : x < cut ? "Driver" : "Team");
+  } else {
+    label = (x) => (x == null ? null : x < 18 ? "Driver" : "Team");
+  }
+  const out = chunks.map((c, i) => ({ who: label(snr[i]), text: c.text }));
+  // short lines with no reading take the speaker of the line before
+  for (let i = 1; i < out.length; i++) if (!out[i].who) out[i].who = out[i - 1].who;
+  // merge consecutive lines from the same speaker
+  return out.reduce((acc, c) => { const last = acc.at(-1); if (last && last.who === c.who) last.text += ` ${c.text}`; else acc.push({ ...c }); return acc; }, []);
+}
+
+// ---------- listening: record this tab's audio while a clip plays ----------
+let tabStream = null;
+export async function startListening() {
+  if (tabStream) return true;
+  try {
+    const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true, selfBrowserSurface: "include", surfaceSwitching: "exclude", systemAudio: "exclude" });
+    const audioTracks = s.getAudioTracks();
+    for (const t of s.getVideoTracks()) t.stop(); // only the sound is needed
+    if (!audioTracks.length) { status.error = "No sound was shared — choose this tab and tick “Also share tab audio”."; changed(); return false; }
+    tabStream = new MediaStream(audioTracks);
+    audioTracks[0].addEventListener("ended", () => { tabStream = null; status.listening = false; changed(); });
+    status.listening = true; status.error = null; changed();
+    return true;
+  } catch (e) {
+    status.error = /denied|not allowed|NotAllowed/i.test(e.message) ? "Sharing was cancelled." : `Couldn't listen: ${e.message}`;
+    changed();
+    return false;
+  }
+}
+export function stopListening() { for (const t of tabStream?.getTracks() ?? []) t.stop(); tabStream = null; status.listening = false; changed(); }
+
+// call when a clip starts playing; it's recorded until it ends, then transcribed
+export function captureClip(audioEl, url) {
+  if (!tabStream || saved[url] || ["working", "listening"].includes(pending.get(url))) return;
+  let rec;
+  try { rec = new MediaRecorder(tabStream); } catch { return; }
+  const parts = [];
+  rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+  rec.onstop = async () => {
+    const played = audioEl.currentTime || 0, full = audioEl.duration || 0;
+    if (full && played < full * 0.9) { pending.set(url, "needs-listen"); changed(); return; } // stopped early: try again next time
+    try {
+      const audio = await toSamples(await new Blob(parts, { type: rec.mimeType }).arrayBuffer());
+      await finish(url, audio);
+    } catch (e) { pending.set(url, `Couldn't transcribe: ${e.message}`); changed(); }
+  };
+  const stop = () => { audioEl.removeEventListener("ended", stop); audioEl.removeEventListener("pause", stop); if (rec.state !== "inactive") rec.stop(); };
+  audioEl.addEventListener("ended", stop);
+  audioEl.addEventListener("pause", stop);
+  pending.set(url, "listening"); changed();
+  rec.start();
 }
