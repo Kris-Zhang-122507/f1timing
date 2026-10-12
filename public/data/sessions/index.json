@@ -22,7 +22,8 @@
    "telemetry": true,
    "incidents": 0,
    "v": 4,
-   "gps": true
+   "gps": true,
+   "grid": true
   },
   {
    "key": 11384,
@@ -65,7 +66,8 @@
    "laps": 20,
    "telemetry": true,
    "incidents": 6,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11379,
@@ -110,7 +112,8 @@
    "laps": 55,
    "telemetry": true,
    "incidents": 6,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11730,
@@ -151,7 +154,8 @@
    "laps": 51,
    "telemetry": true,
    "incidents": 4,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11373,
@@ -192,7 +196,8 @@
    "laps": 57,
    "v": 4,
    "telemetry": true,
-   "incidents": 2
+   "incidents": 2,
+   "grid": true
   },
   {
    "key": 11365,
@@ -236,7 +241,8 @@
    "laps": 53,
    "v": 4,
    "telemetry": true,
-   "incidents": 0
+   "incidents": 0,
+   "grid": true
   },
   {
    "key": 11357,
@@ -280,7 +286,8 @@
    "laps": 72,
    "telemetry": true,
    "incidents": 2,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11349,
@@ -321,7 +328,8 @@
    "laps": 24,
    "telemetry": true,
    "incidents": 0,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11344,
@@ -364,7 +372,8 @@
    "laps": 70,
    "telemetry": true,
    "incidents": 4,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11338,
@@ -408,7 +417,8 @@
    "laps": 45,
    "telemetry": true,
    "incidents": 6,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11330,
@@ -452,7 +462,8 @@
    "laps": 52,
    "telemetry": true,
    "incidents": 0,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11322,
@@ -494,7 +505,8 @@
    "laps": 17,
    "telemetry": true,
    "incidents": 2,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11317,
@@ -538,7 +550,8 @@
    "laps": 71,
    "telemetry": true,
    "incidents": 0,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11311,
@@ -581,7 +594,8 @@
    "laps": 66,
    "telemetry": true,
    "incidents": 0,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11303,
@@ -625,7 +639,8 @@
    "laps": 78,
    "telemetry": true,
    "incidents": 3,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11295,
@@ -669,7 +684,8 @@
    "laps": 68,
    "telemetry": true,
    "incidents": 4,
-   "v": 4
+   "v": 4,
+   "grid": true
   },
   {
    "key": 11287,
@@ -711,8 +727,9 @@
    "laps": 23,
    "telemetry": true,
    "incidents": 0,
-   "v": 4
+   "v": 4,
+   "grid": true
   }
  ],
- "updated": "2026-10-11T23:10:08.278Z"
+ "updated": "2026-10-12T02:23:22.859Z"
 }
