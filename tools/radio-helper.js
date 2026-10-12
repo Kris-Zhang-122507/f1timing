@@ -20,13 +20,23 @@ const toBase64 = (bytes) => {
 
 // Whisper on Cloudflare. Radio is noisy and squashed, so if the newer model returns nothing,
 // try the older one too. Segments: [{ start, end, text }]
-async function transcribeBytes(env, bytes) {
+// A hint about what the audio is helps Whisper with F1 words ("box", "copy", "DRS").
+const HINT = "Formula 1 team radio between a driver and his race engineer. Box, box. Copy. Push now. Gap, tyres, DRS, safety car.";
+// Whisper's well-known habit: on noise or silence it "hears" one of these
+const FILLER = /^(thank you|thanks|thanks for watching|you|bye|okay|so|uh|um|\.+)[.!?]*$/i;
+// Whisper's own test for a line that's really silence: likely no speech AND low confidence
+const real = (s) => !(Number(s.no_speech_prob) > 0.6 && Number(s.avg_logprob) < -1) && !(FILLER.test(s.text) && Number(s.no_speech_prob) > 0.25) && !(Number(s.compression_ratio) > 2.6);
+
+async function transcribeBytes(env, bytes, debug = false) {
   const tried = [];
   try {
-    const r = await env.AI.run(TURBO, { audio: toBase64(bytes), language: "en" });
-    const segments = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim() })).filter((s) => s.text);
-    if (String(r.text ?? "").trim()) return { text: r.text.trim(), segments, model: TURBO };
-    tried.push(`${TURBO}: no words`);
+    const r = await env.AI.run(TURBO, { audio: toBase64(bytes), language: "en", initial_prompt: HINT });
+    const raw = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim(), no_speech_prob: s.no_speech_prob, avg_logprob: s.avg_logprob, compression_ratio: s.compression_ratio })).filter((s) => s.text && s.text !== HINT);
+    const kept = raw.filter(real);
+    const segments = kept.map(({ start, end, text }) => ({ start, end, text }));
+    const text = segments.map((s) => s.text).join(" ");
+    if (text) return { text, segments, model: TURBO, ...(debug ? { raw } : {}) };
+    tried.push(raw.length ? `${TURBO}: only noise (${raw.map((s) => s.text).join(" ")})` : `${TURBO}: no words`);
   } catch (e) { tried.push(`${TURBO}: ${e.message}`); }
   try {
     const r = await env.AI.run(CLASSIC, { audio: [...bytes] });
@@ -37,10 +47,21 @@ async function transcribeBytes(env, bytes) {
       if (last && w.start - last.end < 0.7) { last.text += ` ${w.word}`; last.end = w.end; }
       else segments.push({ start: w.start, end: w.end, text: String(w.word ?? "") });
     }
-    if (String(r.text ?? "").trim()) return { text: r.text.trim(), segments: segments.map((s) => ({ ...s, text: s.text.trim() })), model: CLASSIC };
-    tried.push(`${CLASSIC}: no words`);
+    const text = String(r.text ?? "").trim();
+    if (text && !FILLER.test(text)) return { text, segments: segments.map((s) => ({ ...s, text: s.text.trim() })), model: CLASSIC };
+    tried.push(text ? `${CLASSIC}: only noise (${text})` : `${CLASSIC}: no words`);
   } catch (e) { tried.push(`${CLASSIC}: ${e.message}`); }
   return { text: "", segments: [], tried };
+}
+
+// length of an mp3 in seconds, from its first frame header (F1's clips are constant bitrate)
+function seconds(bytes) {
+  let i = 0;
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) i = 10 + ((bytes[6] << 21) | (bytes[7] << 14) | (bytes[8] << 7) | bytes[9]); // skip ID3 tag
+  if (bytes[i] !== 0xff || (bytes[i + 1] & 0xe0) !== 0xe0) return null;
+  const v1 = (bytes[i + 1] & 0x18) === 0x18;
+  const kbps = (v1 ? [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320] : [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160])[bytes[i + 2] >> 4];
+  return kbps ? Math.round(((bytes.length - i) * 8) / (kbps * 1000) * 10) / 10 : null;
 }
 
 export default {
@@ -55,7 +76,7 @@ export default {
     const cache = caches.default;
     const debug = u.pathname.startsWith("/debug");
     // the "v" changes whenever the helper changes, so answers from an older version aren't reused
-    const key = new Request(`${u.origin}${u.pathname}?v=2&url=${encodeURIComponent(clip)}`);
+    const key = new Request(`${u.origin}${u.pathname}?v=3&url=${encodeURIComponent(clip)}`);
     const hit = debug ? null : await cache.match(key);
     if (hit) return hit;
 
@@ -67,8 +88,8 @@ export default {
     if (debug) {
       // what the helper sees, for checking the set-up: /debug?url=<clip>
       const head = [...bytes.subarray(0, 12)].map((b) => b.toString(16).padStart(2, "0")).join(" ");
-      const result = env.AI ? await transcribeBytes(env, bytes) : { error: "no Workers AI binding named AI" };
-      return Response.json({ f1Status: res.status, f1Type: res.headers.get("content-type"), bytes: bytes.length, head, result }, { headers: cors });
+      const result = env.AI ? await transcribeBytes(env, bytes, true) : { error: "no Workers AI binding named AI" };
+      return Response.json({ f1Status: res.status, f1Type: res.headers.get("content-type"), bytes: bytes.length, seconds: seconds(bytes), head, result }, { headers: cors });
     }
     if (u.pathname.startsWith("/transcribe")) {
       if (!env.AI) return Response.json({ error: "Workers AI isn't connected — add a Workers AI binding named AI (step 4 of the guide)." }, { status: 500, headers: cors });
