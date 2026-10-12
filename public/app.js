@@ -1,24 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4wen66";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4wen66";
-import { CircleView } from "./circle.js?v=mv4wen66";
-import { renderTyres } from "./tyres.js?v=mv4wen66";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4wen66";
-import { renderCompare } from "./compare.js?v=mv4wen66";
-import { renderRewind } from "./rewind.js?v=mv4wen66";
-import { renderDriver } from "./driver.js?v=mv4wen66";
-import { Player, parseRecording } from "./player.js?v=mv4wen66";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4wen66";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4wen66";
-import { Dashboard } from "./dash.js?v=mv4wen66";
-import { CarTelemetry } from "./telemetry.js?v=mv4wen66";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4wen66";
-import * as tx from "./transcribe.js?v=mv4wen66";
-import { renderKnockout } from "./quali.js?v=mv4wen66";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv4wen66";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4wen66";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4wen66";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4wen66";
+import { LiveState } from "./lib/state.js?v=mv4zegnc";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4zegnc";
+import { CircleView } from "./circle.js?v=mv4zegnc";
+import { renderTyres } from "./tyres.js?v=mv4zegnc";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4zegnc";
+import { renderCompare } from "./compare.js?v=mv4zegnc";
+import { renderRewind } from "./rewind.js?v=mv4zegnc";
+import { renderDriver } from "./driver.js?v=mv4zegnc";
+import { Player, parseRecording } from "./player.js?v=mv4zegnc";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4zegnc";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4zegnc";
+import { Dashboard } from "./dash.js?v=mv4zegnc";
+import { CarTelemetry } from "./telemetry.js?v=mv4zegnc";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4zegnc";
+import * as tx from "./transcribe.js?v=mv4zegnc";
+import { renderKnockout } from "./quali.js?v=mv4zegnc";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv4zegnc";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4zegnc";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4zegnc";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4zegnc";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -775,7 +775,7 @@ function handleRadio(v) {
   if (fresh.length && $("radioAuto").checked && !playing) play(fresh[fresh.length - 1].url);
   // transcripts: with "Transcribe" on and the model ready, every clip on screen gets one (newest first)
   const txOn = $("radioText").checked;
-  if (txOn && tx.helper()) for (const c of [...clips].reverse()) if (!tx.transcriptOf(c.url) && !tx.stateOf(c.url)) tx.transcribe(c.url);
+  if (txOn && tx.helper()) for (const c of [...clips].reverse()) if (!tx.transcriptOf(c.url) && !tx.stateOf(c.url)) tx.transcribe(c.url, false, c.name);
   const key = clips.map((c) => c.url).join("|") + (playing ?? "") + `|${txOn}|${txVersion}`;
   if (key === radioKey || tab !== "overview") return;
   radioKey = key;
@@ -802,7 +802,8 @@ function drawTxCard() {
 }
 function txLine(url) {
   const t = tx.transcriptOf(url);
-  if (t) return (Array.isArray(t) ? t : [{ who: null, text: t }]).map((l) => `<div class="tx-line">${l.who ? `<span class="who-tag ${l.who === "Driver" ? "drv" : "team"}">${l.who === "Driver" ? "DRIVER" : "TEAM"}</span>` : ""}<span>${esc(l.text)}</span></div>`).join("");
+  // each tag is a button: click it to swap driver/team if the guess is wrong
+  if (t) return (Array.isArray(t) ? t : [{ who: null, text: t }]).map((l, i) => `<div class="tx-line">${l.text === "(no words picked up)" ? "" : `<button class="who-tag ${l.who === "Driver" ? "drv" : l.who === "Team" ? "team" : "unk"}" data-flip="${esc(url)}" data-i="${i}" title="${l.who ? `Wrong? Click to mark as ${l.who === "Driver" ? "team" : "driver"}` : "Not sure who this is — click to mark as driver, again for team"}">${l.who === "Driver" ? "DRIVER" : l.who === "Team" ? "TEAM" : "?"}</button>`}<span>${esc(l.text)}</span></div>`).join("");
   const st = tx.stateOf(url);
   if (st === "working") return `<span class="muted">transcribing…</span><div class="tx-busy"><i></i></div>`;
   if (st === "queued") return `<span class="muted">waiting to transcribe…</span>`;
@@ -814,7 +815,7 @@ function txLine(url) {
 // the card at the top of the radio panel: download the speech model, with a progress bar
 function txCard() {
   const h = tx.helper();
-  if (h && !txEditing) return `<div class="tx-card ok small"><div>Radio helper connected — new clips are written out as text, each line marked driver or team (a best guess).</div>
+  if (h && !txEditing) return `<div class="tx-card ok small"><div>Radio helper connected — new clips are written out as text, each line marked driver or team — a best guess from the words and the voices. Click a tag to fix it.</div>
       ${tx.status.error ? `<div class="tx-err">${esc(tx.status.error)}</div>` : ""}
       <button class="linkbtn" id="txEdit">Change helper address</button></div>`;
   return `<div class="tx-card small">
@@ -868,7 +869,9 @@ function play(url) {
 radioPlayer.addEventListener("ended", () => { playing = null; radioKey = ""; if (view) handleRadio(view); });
 $("radio").addEventListener("click", (e) => {
   const t = e.target.closest("button[data-tx]");
-  if (t) { tx.transcribe(t.dataset.tx, true); return; }
+  if (t) { tx.transcribe(t.dataset.tx, true, view?.radio?.find((c) => c.url === t.dataset.tx)?.name ?? ""); return; }
+  const f = e.target.closest("button[data-flip]");
+  if (f) { tx.flip(f.dataset.flip, Number(f.dataset.i)); return; }
   const b = e.target.closest("button[data-url]");
   if (b) play(b.dataset.url);
 });

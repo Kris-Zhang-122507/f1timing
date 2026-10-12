@@ -1,5 +1,5 @@
 // Undercut radio helper — a free Cloudflare Worker that lets the site transcribe team radio.
-//   GET /transcribe?url=<clip>  → { text, segments: [{ start, end, text }] }  (Whisper, on Cloudflare)
+//   GET /transcribe?url=<clip>  → { text, segments: [{ start, end, text, words? }] }  (Whisper, on Cloudflare)
 //   GET /?url=<clip>            → the clip's audio (used to tell the driver's voice from the team's)
 // F1's server doesn't let websites read its radio files, so the site asks this helper instead.
 // It only works with F1 team radio .mp3 files, and only answers your Undercut site.
@@ -27,13 +27,16 @@ const FILLER = /^(thank you|thanks|thanks for watching|you|bye|okay|so|uh|um|\.+
 // Whisper's own test for a line that's really silence: likely no speech AND low confidence
 const real = (s) => !(Number(s.no_speech_prob) > 0.6 && Number(s.avg_logprob) < -1) && !(FILLER.test(s.text) && Number(s.no_speech_prob) > 0.25) && !(Number(s.compression_ratio) > 2.6);
 
+// word timings let the site split a line where the speaker changes
+const words = (ws) => (Array.isArray(ws) && ws.length ? ws.map((w) => ({ word: String(w.word ?? "").trim(), start: w.start, end: w.end })) : undefined);
+
 async function transcribeBytes(env, bytes, debug = false) {
   const tried = [];
   try {
     const r = await env.AI.run(TURBO, { audio: toBase64(bytes), language: "en", initial_prompt: HINT });
-    const raw = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim(), no_speech_prob: s.no_speech_prob, avg_logprob: s.avg_logprob, compression_ratio: s.compression_ratio })).filter((s) => s.text && s.text !== HINT);
+    const raw = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim(), words: words(s.words), no_speech_prob: s.no_speech_prob, avg_logprob: s.avg_logprob, compression_ratio: s.compression_ratio })).filter((s) => s.text && s.text !== HINT);
     const kept = raw.filter(real);
-    const segments = kept.map(({ start, end, text }) => ({ start, end, text }));
+    const segments = kept.map(({ start, end, text, words }) => ({ start, end, text, ...(words ? { words } : {}) }));
     const text = segments.map((s) => s.text).join(" ");
     if (text) return { text, segments, model: TURBO, ...(debug ? { raw } : {}) };
     tried.push(raw.length ? `${TURBO}: only noise (${raw.map((s) => s.text).join(" ")})` : `${TURBO}: no words`);
@@ -45,7 +48,8 @@ async function transcribeBytes(env, bytes, debug = false) {
     for (const w of r.words ?? []) {
       const last = segments.at(-1);
       if (last && w.start - last.end < 0.7) { last.text += ` ${w.word}`; last.end = w.end; }
-      else segments.push({ start: w.start, end: w.end, text: String(w.word ?? "") });
+      else segments.push({ start: w.start, end: w.end, text: String(w.word ?? ""), words: [] });
+      segments.at(-1).words.push({ word: String(w.word ?? "").trim(), start: w.start, end: w.end });
     }
     const text = String(r.text ?? "").trim();
     if (text && !FILLER.test(text)) return { text, segments: segments.map((s) => ({ ...s, text: s.text.trim() })), model: CLASSIC };
@@ -76,7 +80,7 @@ export default {
     const cache = caches.default;
     const debug = u.pathname.startsWith("/debug");
     // the "v" changes whenever the helper changes, so answers from an older version aren't reused
-    const key = new Request(`${u.origin}${u.pathname}?v=3&url=${encodeURIComponent(clip)}`);
+    const key = new Request(`${u.origin}${u.pathname}?v=4&url=${encodeURIComponent(clip)}`);
     const hit = debug ? null : await cache.match(key);
     if (hit) return hit;
 

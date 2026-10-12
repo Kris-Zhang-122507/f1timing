@@ -619,6 +619,10 @@ td.pu.total { background: #1A1E27; }
 .who-tag { flex: 0 0 auto; font: 700 9px "Barlow", sans-serif; letter-spacing: .08em; padding: 1px 5px; border-radius: 3px; }
 .who-tag.drv { background: #3A2A0A; color: var(--accent-soft); }
 .who-tag.team { background: #10283A; color: #90CDF4; }
+button.who-tag { border: 0; cursor: pointer; line-height: 1.5; min-width: 46px; }
+button.who-tag:hover { filter: brightness(1.35); }
+button.who-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.who-tag.unk { background: #22262E; color: var(--muted); }
 .tx-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .tx-steps a, .tx-card a { color: var(--accent-soft); }
 .tx-helper { display: flex; gap: 6px; margin-top: 6px; }
