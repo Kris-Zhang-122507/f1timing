@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/gridstack/gridstack.min.css">
 <link rel="stylesheet" href="vendor/gridstack/gridstack-24.css">
-<link rel="stylesheet" href="style.css?v=mv4hrnq5">
+<link rel="stylesheet" href="style.css?v=mv4k2wrh">
 </head>
 <body>
 <div class="edge" id="edge" aria-hidden="true"></div><div class="edge-pulse" id="edgePulse" aria-hidden="true"></div>
@@ -25,16 +25,6 @@
     <div class="mono muted small" id="weather"></div>
     <div class="spacer"></div>
     <div class="conn" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></div>
-    <details class="menu delay" id="delayMenu">
-      <summary id="delaySum" title="Hold the timing back so it matches your TV or stream">TV delay: off</summary>
-      <div class="menu-list delay-box">
-        <div class="delay-row"><label for="delayRange">Delay</label><input type="range" id="delayRange" min="0" max="120" step="1" value="0"><span class="mono" id="delayVal">0 s</span></div>
-        <div class="delay-row btns"><button type="button" data-d="-5">−5</button><button type="button" data-d="-1">−1</button><button type="button" data-d="1">+1</button><button type="button" data-d="5">+5</button><button type="button" data-d="0" id="delayOff">Off</button></div>
-        <button type="button" class="delay-sync" id="syncLap">The lap counter just changed on my TV</button>
-        <button type="button" class="delay-sync" id="syncStart">The lights just went out on my TV</button>
-        <div class="menu-note muted small" id="delayNote">Live timing runs ahead of TV and streams. Press a button the moment it happens on your screen, or drag the slider, and the whole site waits to match.</div>
-      </div>
-    </details>
     <div class="rec">
       <label class="btn">Load recording<input type="file" id="recFile" accept=".jsonl,.json,.txt" hidden></label>
     </div>
@@ -65,6 +55,7 @@
       <button class="btn" id="plMinus" aria-label="Timing 1 second earlier">−1s</button>
       <button class="btn" id="plPlus" aria-label="Timing 1 second later">+1s</button>
       <label class="muted small shield"><input type="checkbox" id="plShield" checked> Spoiler shield</label>
+      <form class="pl-lap" id="plLapForm"><label class="muted small" for="plLap">Lap</label><input type="number" id="plLap" min="1" max="99" inputmode="numeric"><button class="btn" type="submit">Go</button></form>
       <button class="btn" id="plLive">Back to live</button>
     </div>
     <div class="pl-track" id="plTrack">
@@ -86,6 +77,20 @@
     <button data-tab="news">News</button>
     <button data-tab="schedule">Schedule</button>
     <div class="spacer"></div>
+    <details class="menu delay" id="delayMenu">
+      <summary id="delaySum" title="Hold the timing back so it matches your TV or stream">TV delay: off</summary>
+      <div class="menu-list delay-box">
+        <form class="delay-lap" id="delayLapForm">
+          <label for="delayLap">Lap showing on my TV</label>
+          <div class="delay-row"><input type="number" id="delayLap" min="1" max="99" inputmode="numeric" placeholder="e.g. 23"><button type="submit">Match</button></div>
+          <span class="muted small">Type the lap number and press Match the moment the lap counter on your TV changes to it.</span>
+        </form>
+        <button type="button" class="delay-sync" id="syncStart">The lights just went out on my TV</button>
+        <div class="delay-row"><label for="delayRange">Delay</label><input type="range" id="delayRange" min="0" max="300" step="1" value="0"><span class="mono" id="delayVal">0 s</span></div>
+        <div class="delay-row btns"><button type="button" data-d="-5">−5</button><button type="button" data-d="-1">−1</button><button type="button" data-d="1">+1</button><button type="button" data-d="5">+5</button><button type="button" data-d="0" id="delayOff">Off</button></div>
+        <div class="menu-note muted small" id="delayNote">Live timing runs ahead of TV and streams. Once matched, the whole site waits so nothing is spoiled.</div>
+      </div>
+    </details>
     <div class="dash-tools" id="dashTools">
       <details class="menu" id="addMenu"><summary>Add panel</summary><div class="menu-list" id="addList"></div></details>
       <details class="menu" id="layoutMenu"><summary>Layout</summary><div class="menu-list" id="layoutList"></div></details>
@@ -233,6 +238,6 @@
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
 <script src="vendor/gridstack/gridstack-all.js"></script>
-<script type="module" src="app.js?v=mv4hrnq5"></script>
+<script type="module" src="app.js?v=mv4k2wrh"></script>
 </body>
 </html>

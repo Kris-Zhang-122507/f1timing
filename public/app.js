@@ -1,21 +1,21 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4hrnq5";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4hrnq5";
-import { CircleView } from "./circle.js?v=mv4hrnq5";
-import { renderTyres } from "./tyres.js?v=mv4hrnq5";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4hrnq5";
-import { renderCompare } from "./compare.js?v=mv4hrnq5";
-import { renderRewind } from "./rewind.js?v=mv4hrnq5";
-import { renderDriver } from "./driver.js?v=mv4hrnq5";
-import { Player, parseRecording } from "./player.js?v=mv4hrnq5";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4hrnq5";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4hrnq5";
-import { Dashboard } from "./dash.js?v=mv4hrnq5";
-import { CarTelemetry } from "./telemetry.js?v=mv4hrnq5";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4hrnq5";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4hrnq5";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4hrnq5";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4hrnq5";
+import { LiveState } from "./lib/state.js?v=mv4k2wrh";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4k2wrh";
+import { CircleView } from "./circle.js?v=mv4k2wrh";
+import { renderTyres } from "./tyres.js?v=mv4k2wrh";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4k2wrh";
+import { renderCompare } from "./compare.js?v=mv4k2wrh";
+import { renderRewind } from "./rewind.js?v=mv4k2wrh";
+import { renderDriver } from "./driver.js?v=mv4k2wrh";
+import { Player, parseRecording } from "./player.js?v=mv4k2wrh";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4k2wrh";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4k2wrh";
+import { Dashboard } from "./dash.js?v=mv4k2wrh";
+import { CarTelemetry } from "./telemetry.js?v=mv4k2wrh";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4k2wrh";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4k2wrh";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4k2wrh";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4k2wrh";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -153,15 +153,15 @@ function connectDirect() {
 
 // ---------- TV delay: hold live timing back to match your TV or stream ----------
 let tvDelay = 0;
-try { tvDelay = Math.max(0, Math.min(180, Number(localStorage.getItem("undercut.tvDelay")) || 0)); } catch {}
+try { tvDelay = Math.max(0, Math.min(600, Number(localStorage.getItem("undercut.tvDelay")) || 0)); } catch {}
 const delayedMsgs = [];   // direct-from-F1 messages waiting to be shown
 const delayedViews = [];  // ready-made views from the Undercut server, waiting
-const arrivals = { start: null, lap: null }; // when lights out / the last lap change reached us (undelayed)
+const arrivals = { start: null, lap: null, laps: {} }; // when lights out / each lap change reached us (undelayed)
 function noteArrival(topicOrView, data) {
   if (typeof topicOrView === "string") {
     if (topicOrView === "SessionStatus" && data?.Status === "Started") arrivals.start = Date.now();
-    if (topicOrView === "LapCount" && data?.CurrentLap) arrivals.lap = Date.now();
-  } else if (topicOrView?.lap && topicOrView.lap !== noteArrival.lastLap) { noteArrival.lastLap = topicOrView.lap; arrivals.lap = Date.now(); }
+    if (topicOrView === "LapCount" && data?.CurrentLap) { arrivals.lap = Date.now(); arrivals.laps[data.CurrentLap] ??= Date.now(); }
+  } else if (topicOrView?.lap && topicOrView.lap !== noteArrival.lastLap) { noteArrival.lastLap = topicOrView.lap; arrivals.lap = Date.now(); arrivals.laps[topicOrView.lap] ??= Date.now(); }
 }
 function liveIn(topic, data) {
   noteArrival(topic, data);
@@ -176,9 +176,9 @@ setInterval(() => {
   if (latest && useServer) { view = latest; render(); }
 }, 100);
 function setDelay(sec) {
-  tvDelay = Math.round(Math.max(0, Math.min(180, sec)));
+  tvDelay = Math.round(Math.max(0, Math.min(600, sec)));
   try { localStorage.setItem("undercut.tvDelay", String(tvDelay)); } catch {}
-  $("delayRange").value = Math.min(120, tvDelay);
+  $("delayRange").value = Math.min(300, tvDelay);
   $("delayVal").textContent = `${tvDelay} s`;
   $("delaySum").textContent = tvDelay ? `TV delay: ${tvDelay}s` : "TV delay: off";
   $("delayMenu").classList.toggle("on", tvDelay > 0);
@@ -194,7 +194,25 @@ function syncTo(at, what) {
   setDelay((Date.now() - at) / 1000);
   $("delayNote").textContent = `Matched: the site now runs ${tvDelay}s behind live timing.`;
 }
-$("syncLap").addEventListener("click", () => syncTo(arrivals.lap, "a lap change"));
+$("delayLapForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const lap = Number($("delayLap").value);
+  if (!lap) { $("delayLap").focus(); return; }
+  const known = Object.keys(arrivals.laps).map(Number).sort((a, b) => a - b);
+  if (!arrivals.laps[lap]) {
+    $("delayNote").textContent = known.length
+      ? `This page has seen laps ${known[0]}–${known[known.length - 1]} start. Pick one of those, or wait for the next lap change on your TV.`
+      : "No lap changes seen yet — keep the page open until the race is running, then try again.";
+    return;
+  }
+  syncTo(arrivals.laps[lap], `lap ${lap}`);
+});
+// suggest the lap your TV is probably on
+$("delayMenu").addEventListener("toggle", () => {
+  if (!$("delayMenu").open) return;
+  const known = Object.keys(arrivals.laps).map(Number);
+  if (known.length && !$("delayLap").value) $("delayLap").value = Math.max(...known);
+});
 $("syncStart").addEventListener("click", () => syncTo(arrivals.start, "the race start"));
 document.addEventListener("click", (e) => { const m = $("delayMenu"); if (m.open && !m.contains(e.target)) m.open = false; });
 
@@ -334,6 +352,12 @@ function drawPlayer() {
 $("plPlay").addEventListener("click", () => player?.toggle());
 $("plSeek").addEventListener("input", (e) => { if (player) player.seek(player.first + (Number(e.target.value) / 1000) * (player.end - player.first)); });
 $("plMarks").addEventListener("click", (e) => { const m = e.target.closest("[data-ms]"); if (m && player) player.seek(Number(m.dataset.ms) - 5000); });
+$("plLapForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const lap = Number($("plLap").value), l = player?.laps?.find((x) => x.lap === lap);
+  if (l) player.seek(l.ms - 3000);
+  else if (player?.laps?.length) $("plLap").value = Math.max(1, Math.min(lap || 1, player.laps.at(-1).lap));
+});
 $("plBack").addEventListener("click", () => player?.seek(player.now - 10000));
 $("plFwd").addEventListener("click", () => player?.seek(player.now + 10000));
 $("plMinus").addEventListener("click", () => player?.seek(player.now - 1000));

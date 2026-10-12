@@ -562,8 +562,14 @@ td.pu.total { background: #1A1E27; }
 .delay-box { width: 300px; gap: 8px; padding: 10px; }
 .delay-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .delay-row input[type=range] { flex: 1 1 auto; accent-color: var(--accent); }
-.delay-row .mono { min-width: 40px; text-align: right; }
+.delay-row .mono { min-width: 48px; text-align: right; white-space: nowrap; }
 .delay-row.btns button { flex: 1 1 0; min-height: 30px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--soft); font: 600 13px "JetBrains Mono", monospace; cursor: pointer; }
 .delay-row.btns button:hover { border-color: var(--accent); }
 .menu-list .delay-sync { text-align: center; background: #3A2A0A; color: var(--accent-soft); font-weight: 600; }
 .menu-list .delay-sync:hover { background: #4A360E; }
+.delay-lap { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.delay-lap input, .pl-lap input { width: 70px; min-height: 30px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0 8px; font: 600 14px "JetBrains Mono", monospace; }
+.menu-list .delay-lap button, .menu-list .delay-lap button:hover { min-height: 30px; padding: 0 14px; border: 0; border-radius: 4px; background: var(--accent); color: #1A1204; font: 600 13px "Barlow", sans-serif; cursor: pointer; }
+.pl-lap { display: flex; align-items: center; gap: 6px; }
+.pl-lap input { width: 56px; }
+.tabs .delay .menu-list { right: auto; left: 0; }
