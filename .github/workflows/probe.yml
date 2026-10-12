@@ -1,0 +1,20 @@
+# Temporary: can GitHub's runners download F1 team radio clips? Safe to delete.
+name: Probe radio access
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Try
+        run: |
+          U="https://livetiming.formula1.com/static/2026/2026-10-11_Singapore_Grand_Prix/2026-10-11_Race/TeamRadio/ALB_23_20261011_195602.mp3"
+          for ua in "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36" "BestHTTP" "curl/8"; do
+            echo "$(curl -s -o clip.mp3 -w '%{http_code} %{size_download}' -A "$ua" "$U") | $ua" >> probe.txt
+          done
+          curl -sI -H "Origin: https://kris-zhang-122507.github.io" "$U" >> probe.txt || true
+          mkdir out && cp probe.txt out/ && (cp clip.mp3 out/ 2>/dev/null || true)
+          cd out && git init -q . && git config user.name probe && git config user.email probe@users.noreply.github.com
+          git add -A && git commit -qm probe
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/probe
