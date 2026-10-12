@@ -21,11 +21,12 @@ const PRESETS = {
   ] },
   quali: { name: "Qualifying", panels: [
     { id: "timing", x: 0, y: 0, w: 15, h: 36 },
-    { id: "track", x: 15, y: 0, w: 9, h: 16 },
-    { id: "rcm", x: 15, y: 16, w: 9, h: 20 },
-    { id: "stewards", x: 0, y: 36, w: 8, h: 18 },
-    { id: "radio", x: 8, y: 36, w: 8, h: 18 },
-    { id: "story", x: 16, y: 36, w: 8, h: 18 },
+    { id: "quali", x: 15, y: 0, w: 9, h: 36 },
+    { id: "track", x: 0, y: 36, w: 8, h: 18 },
+    { id: "rcm", x: 8, y: 36, w: 8, h: 18 },
+    { id: "stewards", x: 16, y: 36, w: 8, h: 18 },
+    { id: "radio", x: 0, y: 54, w: 8, h: 16 },
+    { id: "story", x: 8, y: 54, w: 8, h: 16 },
     { id: "weather", x: 16, y: 54, w: 8, h: 10 },
   ] },
   strategy: { name: "Strategy", panels: [

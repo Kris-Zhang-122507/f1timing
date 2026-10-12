@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/gridstack/gridstack.min.css">
 <link rel="stylesheet" href="vendor/gridstack/gridstack-24.css">
-<link rel="stylesheet" href="style.css?v=mv4kitnd">
+<link rel="stylesheet" href="style.css?v=mv4ol03x">
 </head>
 <body>
 <div class="edge" id="edge" aria-hidden="true"></div><div class="edge-pulse" id="edgePulse" aria-hidden="true"></div>
@@ -105,7 +105,7 @@
   <div id="tab-rewind" class="stack" hidden></div>
   <div id="tab-driver" hidden></div>
   <div id="tab-replays" class="stack" hidden></div>
-  <div id="tab-standings" class="stack" hidden></div>
+  <div id="tab-standings" class="stack" hidden><div id="standBox" class="stack"></div><div id="h2hBox"></div></div>
   <div id="tab-technical" class="stack" hidden></div>
   <div id="tab-news" class="stack" hidden></div>
   <div id="tab-schedule" class="stack" hidden>
@@ -193,7 +193,7 @@
         <label class="muted small autoplay"><input type="checkbox" id="radioText"> Transcribe</label>
         <label class="muted small autoplay"><input type="checkbox" id="radioAuto"> Auto-play new clips</label>
       </header>
-      <div class="w-body"><div id="radio" class="feed radio-feed"><div class="muted small">Clips appear here as F1 publishes them.</div></div></div>
+      <div class="w-body"><div id="radioTx"></div><div id="radio" class="feed radio-feed"><div class="muted small">Clips appear here as F1 publishes them.</div></div></div>
     </section>
 
     <section class="w" id="w-weather" data-title="Rain watch">
@@ -226,6 +226,11 @@
       <div class="w-body"><div id="pitwin"></div></div>
     </section>
 
+    <section class="w" id="w-quali" data-title="Knockout">
+      <header class="w-head"><h2>Knockout</h2><span class="muted small">qualifying: who gets through?</span></header>
+      <div class="w-body"><div id="knockout"></div></div>
+    </section>
+
     <section class="w" id="w-car" data-title="Car telemetry">
       <header class="w-head"><h2>Car telemetry</h2></header>
       <div class="w-body"><div id="carTele"></div></div>
@@ -239,6 +244,6 @@
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
 <script src="vendor/gridstack/gridstack-all.js"></script>
-<script type="module" src="app.js?v=mv4kitnd"></script>
+<script type="module" src="app.js?v=mv4ol03x"></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
 // Team radio transcripts, made in your own browser with Whisper (OpenAI's open speech model,
 // run by transformers.js). Nothing is uploaded anywhere: the model downloads once (~80 MB, then
 // cached by the browser) and each clip is transcribed on your computer.
-const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6";
+const LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js";
 const MODEL = "Xenova/whisper-base.en";
 const KEY = "undercut.transcripts";
 
 let asr = null, loading = null;
-export const status = { state: "idle", progress: 0, error: null }; // idle | loading | ready | error
+export const status = { state: "idle", progress: 0, loaded: 0, total: 0, error: null }; // idle | loading | ready | error
 const listeners = new Set();
 export const onChange = (fn) => listeners.add(fn);
 const changed = () => { for (const fn of listeners) fn(); };
@@ -19,6 +19,10 @@ const persist = () => {
   try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {}
 };
 export const transcriptOf = (url) => saved[url] ?? null;
+
+// was the model downloaded before? (then it's in the browser's cache and loads quickly)
+export const downloadedBefore = () => { try { return localStorage.getItem(KEY + ".model") === "1"; } catch { return false; } };
+export const loadModel = () => model().catch(() => {});
 
 async function model() {
   if (asr) return asr;
@@ -33,12 +37,14 @@ async function model() {
         if (p.status === "progress" && p.total) {
           files[p.file] = [p.loaded, p.total];
           const [a, b] = Object.values(files).reduce(([x, y], [l, t]) => [x + l, y + t], [0, 0]);
-          status.progress = b ? a / b : 0;
+          status.progress = b ? a / b : 0; status.loaded = a; status.total = b;
           changed();
         }
       },
     });
     status.state = "ready"; changed();
+    setTimeout(run, 0);
+    try { localStorage.setItem(KEY + ".model", "1"); } catch {}
     return asr;
   })().catch((e) => { status.state = "error"; status.error = e.message; loading = null; changed(); throw e; });
   return loading;
@@ -50,12 +56,14 @@ const pending = new Map(); // url -> "queued" | "working" | error text
 export const stateOf = (url) => pending.get(url) ?? null;
 let busy = false;
 
-export function transcribe(url) {
-  if (saved[url] || pending.has(url)) return;
+export function transcribe(url, retry = false) {
+  if (saved[url]) return;
+  if (retry && pending.has(url) && pending.get(url) !== "working") pending.delete(url);
+  if (pending.has(url)) return;
   pending.set(url, "queued");
   queue.unshift(url);
   changed();
-  run();
+  if (status.state === "ready") run();
 }
 
 async function run() {

@@ -1,22 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4kitnd";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4kitnd";
-import { CircleView } from "./circle.js?v=mv4kitnd";
-import { renderTyres } from "./tyres.js?v=mv4kitnd";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4kitnd";
-import { renderCompare } from "./compare.js?v=mv4kitnd";
-import { renderRewind } from "./rewind.js?v=mv4kitnd";
-import { renderDriver } from "./driver.js?v=mv4kitnd";
-import { Player, parseRecording } from "./player.js?v=mv4kitnd";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4kitnd";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4kitnd";
-import { Dashboard } from "./dash.js?v=mv4kitnd";
-import { CarTelemetry } from "./telemetry.js?v=mv4kitnd";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4kitnd";
-import * as tx from "./transcribe.js?v=mv4kitnd";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4kitnd";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4kitnd";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4kitnd";
+import { LiveState } from "./lib/state.js?v=mv4ol03x";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4ol03x";
+import { CircleView } from "./circle.js?v=mv4ol03x";
+import { renderTyres } from "./tyres.js?v=mv4ol03x";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4ol03x";
+import { renderCompare } from "./compare.js?v=mv4ol03x";
+import { renderRewind } from "./rewind.js?v=mv4ol03x";
+import { renderDriver } from "./driver.js?v=mv4ol03x";
+import { Player, parseRecording } from "./player.js?v=mv4ol03x";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4ol03x";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4ol03x";
+import { Dashboard } from "./dash.js?v=mv4ol03x";
+import { CarTelemetry } from "./telemetry.js?v=mv4ol03x";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4ol03x";
+import * as tx from "./transcribe.js?v=mv4ol03x";
+import { renderKnockout } from "./quali.js?v=mv4ol03x";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv4ol03x";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4ol03x";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4ol03x";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4ol03x";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -38,7 +40,8 @@ let techView = "upgrades", techPick = null, puOpen = null;
 const ccUi = { ccBy: "driver", ccCum: false };
 let standingsOk = false; // "show anyway" past the spoiler shield
 let lastSlow = 0;
-let lastCalls = 0;          // stewards / pit window redraw          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
+let lastCalls = 0;          // stewards / pit window redraw
+let lastKnock = 0;          // qualifying knockout panel          // compare / rewind / my driver redraw every 2s (their numbers change per lap)
 let cmpA = null, cmpB = null, rwFocus = null, rwMark = null;
 let dvSel = null;
 try { dvSel = localStorage.getItem("undercut.driver"); } catch {}
@@ -516,6 +519,10 @@ function render() {
     if (dashSet.has("stewards") && !$("stewards").querySelector("details[open]")) $("stewards").innerHTML = renderStewards(v, pitLoss);
     if (dashSet.has("pitwin")) $("pitwin").innerHTML = renderPitWindow(v, pitLoss);
   }
+  if (tab === "overview" && dashSet.has("quali") && Date.now() - lastKnock > 700) {
+    lastKnock = Date.now();
+    $("knockout").innerHTML = renderKnockout(v);
+  }
   if (shows("strategy") && Date.now() - lastStrategy > 2000) { lastStrategy = Date.now(); $("tab-strategy").innerHTML = renderStrategy(v, pitLoss) + renderPitTable(pitData, pitLoss.slug); }
   if (["compare", "rewind", "driver"].some(shows) && Date.now() - lastSlow > 2000) drawSlow(v);
 }
@@ -766,38 +773,77 @@ function handleRadio(v) {
   if (!radioPrimed && clips.length) { for (const c of clips) heard.add(c.url); radioPrimed = true; }
   const fresh = clips.filter((c) => !heard.has(c.url));
   if (fresh.length && $("radioAuto").checked && !playing) play(fresh[fresh.length - 1].url);
-  // transcripts: with "Transcribe" on, every clip on screen gets one (newest first)
+  // transcripts: with "Transcribe" on and the model ready, every clip on screen gets one (newest first)
   const txOn = $("radioText").checked;
-  if (txOn) for (const c of [...clips].reverse()) if (!tx.transcriptOf(c.url) && !tx.stateOf(c.url)) tx.transcribe(c.url);
+  if (txOn && tx.status.state === "ready") for (const c of [...clips].reverse()) if (!tx.transcriptOf(c.url) && !tx.stateOf(c.url)) tx.transcribe(c.url);
   const key = clips.map((c) => c.url).join("|") + (playing ?? "") + `|${txOn}|${txVersion}`;
   if (key === radioKey || tab !== "overview") return;
   radioKey = key;
-  $("radio").innerHTML = clips.length ? clips.map((c) => `<div class="radio-item ${heard.has(c.url) ? "" : "new"}">
+  drawTxCard();
+  $("radio").innerHTML = clips.length ? clips.map((c) => `<div class="radio-item ${heard.has(c.url) ? "" : "new"} ${playing === c.url ? "playing" : ""}">
     <button class="play ${playing === c.url ? "on" : ""}" data-url="${esc(c.url)}" aria-label="${playing === c.url ? "Stop" : "Play"} ${esc(c.name || c.tla)} radio">${playing === c.url ? STOP : PLAY}</button>
-    <div>
+    <div class="radio-main">
       <div class="who"><i style="background:${esc(c.colour)}"></i>${esc(c.tla)}</div>
-      <div class="meta">${c.lap ? "L" + c.lap + " · " : ""}${esc(c.t)} UTC</div>
+      <div class="meta">${c.lap ? "L" + c.lap + " · " : ""}${esc(c.t)} UTC${playing === c.url ? ` · <span class="mono" id="radioTime"></span>` : ""}</div>
+      ${playing === c.url ? `<div class="rp-bar" id="radioBar" role="progressbar" aria-label="Clip progress" aria-valuemin="0" aria-valuemax="100"><i></i></div>` : ""}
       ${txOn || tx.transcriptOf(c.url) ? `<div class="tx">${txLine(c.url)}</div>` : ""}
     </div>
   </div>`).join("") : `<div class="muted small">No team radio yet this session.</div>`;
-  if (txOn && tx.status.state === "loading") $("radio").insertAdjacentHTML("afterbegin", `<div class="tx-model muted small">Downloading the speech model once (about 80 MB) — ${Math.round(tx.status.progress * 100)}%</div>`);
-  if (txOn && tx.status.state === "error") $("radio").insertAdjacentHTML("afterbegin", `<div class="tx-model small">Couldn't load the speech model: ${esc(tx.status.error)}</div>`);
+  updateRadioBar();
 }
 
 let txVersion = 0;
-tx.onChange(() => { txVersion++; if (view) handleRadio(view); });
+tx.onChange(() => { txVersion++; drawTxCard(); if (view) handleRadio(view); });
+// drawn on its own so it shows even before any session data arrives
+let txCardHtml = "";
+function drawTxCard() {
+  const html = $("radioText").checked ? txCard() : "";
+  if (html !== txCardHtml) { txCardHtml = html; $("radioTx").innerHTML = html; }
+}
 function txLine(url) {
   const t = tx.transcriptOf(url);
   if (t) return `“${esc(t)}”`;
   const st = tx.stateOf(url);
-  if (st === "working") return `<span class="muted">transcribing…</span>`;
+  if (st === "working") return `<span class="muted">transcribing…</span><div class="tx-busy"><i></i></div>`;
   if (st === "queued") return `<span class="muted">waiting to transcribe…</span>`;
-  if (st) return `<span class="muted">${esc(st)}</span>`;
+  if (st) return `<span class="muted">${esc(st)}</span> <button class="linkbtn" data-tx="${esc(url)}">Try again</button>`;
+  if (tx.status.state === "ready") return `<button class="linkbtn" data-tx="${esc(url)}">Transcribe</button>`;
   return "";
 }
+// the card at the top of the radio panel: download the speech model, with a progress bar
+function txCard() {
+  const s = tx.status;
+  const mb = (b) => `${Math.round(b / 1e6)} MB`;
+  if (s.state === "ready") return `<div class="tx-card ok small">Speech model ready — new clips are transcribed automatically.</div>`;
+  if (s.state === "loading") return `<div class="tx-card small"><div>Downloading the speech model${s.total ? ` — ${mb(s.loaded)} of ${mb(s.total)}` : "…"}</div>
+      <div class="tx-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.progress * 100)}"><i style="width:${(s.progress * 100).toFixed(1)}%"></i></div>
+      <div class="muted">Only needed once — your browser keeps it for next time.</div></div>`;
+  return `<div class="tx-card small">
+      ${s.state === "error" ? `<div class="tx-err">Couldn't load the speech model: ${esc(s.error)}</div>` : ""}
+      <div>Transcripts are made by a speech model that runs in your browser — free, and nothing is uploaded. It's about 80 MB, downloaded once.</div>
+      <button class="btn primary" id="txDownload">${s.state === "error" ? "Try again" : "Download speech model"}</button></div>`;
+}
+$("radioTx").addEventListener("click", (e) => { if (e.target.id === "txDownload") tx.loadModel(); });
+// playback progress for the clip that's playing
+function updateRadioBar() {
+  const bar = $("radioBar");
+  if (!bar || !playing) return;
+  const d = radioPlayer.duration, t = radioPlayer.currentTime;
+  const pct = d > 0 ? (t / d) * 100 : 0;
+  bar.firstElementChild.style.width = `${pct}%`;
+  bar.setAttribute("aria-valuenow", String(Math.round(pct)));
+  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`;
+  if ($("radioTime")) $("radioTime").textContent = d > 0 ? `${fmt(t)} / ${fmt(d)}` : "loading…";
+}
+radioPlayer.addEventListener("timeupdate", updateRadioBar);
+radioPlayer.addEventListener("loadedmetadata", updateRadioBar);
 try { $("radioText").checked = localStorage.getItem("undercut.radioText") === "1"; } catch {}
+if ($("radioText").checked && tx.downloadedBefore()) tx.loadModel(); // it's cached, so this is quick
+drawTxCard();
 $("radioText").addEventListener("change", (e) => {
   try { localStorage.setItem("undercut.radioText", e.target.checked ? "1" : "0"); } catch {}
+  if (e.target.checked && tx.downloadedBefore()) tx.loadModel();
+  drawTxCard();
   radioKey = "";
   if (view) handleRadio(view);
 });
@@ -810,6 +856,8 @@ function play(url) {
 }
 radioPlayer.addEventListener("ended", () => { playing = null; radioKey = ""; if (view) handleRadio(view); });
 $("radio").addEventListener("click", (e) => {
+  const t = e.target.closest("button[data-tx]");
+  if (t) { tx.transcribe(t.dataset.tx, true); return; }
   const b = e.target.closest("button[data-url]");
   if (b) play(b.dataset.url);
 });
@@ -934,11 +982,13 @@ $("tab-schedule").addEventListener("click", (e) => {
 // ---------- standings ----------
 async function drawStandings(v) {
   lastStand = Date.now();
-  const box = $("tab-standings");
+  const box = $("standBox");
   if (v?.mode === "replay" && $("plShield").checked && !standingsOk) {
-    box.innerHTML = `<section class="card"><h2>Standings</h2><div class="muted small">Hidden by the spoiler shield — the championship table would tell you how this race ended.</div><button class="btn" id="standShow">Show anyway</button></section>`;
+    box.innerHTML = `<section class="card"><h2>Standings</h2><div class="muted small">Hidden by the spoiler shield — the championship table and head to heads would tell you how this race ended.</div><button class="btn" id="standShow">Show anyway</button></section>`;
+    $("h2hBox").innerHTML = "";
     return;
   }
+  drawH2H();
   if (!box.innerHTML.trim()) box.innerHTML = renderStandings(null);
   try {
     const [st] = await Promise.all([loadStandings(), races ? null : loadSchedule().then((r) => { races = r; }).catch(() => {})]);
@@ -960,6 +1010,27 @@ $("tab-schedule").addEventListener("click", async (e) => {
   a.download = b.id === "icsRaces" ? "f1-races.ics" : "f1-sessions.ics";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+// head to head: drawn only when it loads or you pick drivers (not on every refresh)
+let h2hA = null, h2hB = null, h2hDrawn = false;
+try { [h2hA, h2hB] = JSON.parse(localStorage.getItem("undercut.h2h")) ?? []; } catch {}
+async function drawH2H(force = false) {
+  if (h2hDrawn && !force) return;
+  if (!$("h2hBox").innerHTML) $("h2hBox").innerHTML = renderH2H(null);
+  try {
+    const season = await loadSeason();
+    if (!h2hA && view?.rows?.length) { const me = view.rows.find((r) => r.n === dvSel); if (me) h2hA = me.tla; }
+    $("h2hBox").innerHTML = renderH2H(season, h2hA, h2hB);
+    h2hDrawn = true;
+  } catch {
+    $("h2hBox").innerHTML = `<section class="card"><h2>Head to head</h2><div class="muted small">Couldn't load this season's results right now.</div></section>`;
+  }
+}
+$("h2hBox").addEventListener("change", (e) => {
+  if (e.target.id === "h2hA") h2hA = e.target.value;
+  if (e.target.id === "h2hB") h2hB = e.target.value;
+  try { localStorage.setItem("undercut.h2h", JSON.stringify([h2hA, h2hB])); } catch {}
+  drawH2H(true);
 });
 $("tab-standings").addEventListener("click", (e) => { if (e.target.id === "standShow") { standingsOk = true; drawStandings(view); } });
 

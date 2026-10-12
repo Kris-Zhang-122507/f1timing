@@ -15,6 +15,7 @@ export function parseRecording(text) {
   }
   lines.sort((a, b) => a.ms - b.ms);
   spreadMinisectors(lines);
+  qualiParts(lines);
   // Clean up two quirks in older replay files: a lap counter that briefly goes backwards,
   // and the chequered flag being mistaken for a red flag.
   let maxLap = 0;
@@ -54,6 +55,53 @@ function spreadMinisectors(lines) {
     }
   }
   if (!extra.length) return;
+  lines.push(...extra);
+  lines.sort((a, b) => a.ms - b.ms);
+}
+
+// Archived qualifying replays don't say which part (Q1/Q2/Q3) is running or who was knocked
+// out, so the knockout zone can't be drawn. Work it out: each part ends with a chequered flag
+// and the next starts at the following green light; the slowest cars in a part are out.
+function qualiParts(lines) {
+  const info = lines.find((l) => l.topic === "SessionInfo")?.data;
+  if (!/Qualifying|Shootout/i.test(`${info?.Type ?? ""} ${info?.Name ?? ""}`)) return;
+  if (lines.some((l) => l.topic === "TimingData" && l.data?.SessionPart != null)) return; // already there (live recording)
+  const drivers = new Set();
+  for (const l of lines) if (l.topic === "DriverList") for (const n of Object.keys(l.data ?? {})) drivers.add(n);
+  const N = drivers.size || 20;
+  const advance = N >= 22 ? [N, 16, 10] : N >= 20 ? [N, 15, 10] : [N, Math.round(N * 0.75), 10];
+  const time = (v) => { const m = String(v ?? "").match(/^(?:(\d+):)?(\d+\.\d+)$/); return m ? Number(m[1] ?? 0) * 60 + Number(m[2]) : null; };
+  const extra = [];
+  const first = lines.find((l) => l.topic === "SessionInfo")?.ms ?? lines[0].ms;
+  extra.push({ ms: first + 1, topic: "TimingData", data: { SessionPart: 1, NoEntries: advance } });
+  let part = 1, flagged = false, out = new Set();
+  let best = {}; // driver -> best lap in this part
+  for (const l of lines) {
+    if (l.topic === "RaceControlMessages") {
+      for (const m of Object.values(l.data?.Messages ?? {})) {
+        const msg = String(m?.Message ?? "").toUpperCase();
+        if (/CHEQUERED FLAG/.test(msg)) flagged = true;
+        else if (flagged && /GREEN LIGHT/.test(msg) && part < 3) {
+          // the next part begins: everyone outside the top places in this part is out
+          const ranked = [...drivers].filter((n) => !out.has(n)).sort((a, b) => (best[a] ?? Infinity) - (best[b] ?? Infinity));
+          const keep = advance[part];
+          const knocked = ranked.slice(keep);
+          part++; flagged = false; best = {};
+          const update = { SessionPart: part, Lines: {} };
+          for (const n of knocked) { out.add(n); update.Lines[n] = { KnockedOut: true }; }
+          extra.push({ ms: l.ms, topic: "TimingData", data: update });
+        }
+      }
+    }
+    if (l.topic !== "TimingData") continue;
+    for (const [n, d] of Object.entries(l.data?.Lines ?? {})) {
+      const t = time(d?.LastLapTime?.Value);
+      if (t && !out.has(n) && (best[n] == null || t < best[n])) {
+        best[n] = t;
+        extra.push({ ms: l.ms + 1, topic: "TimingData", data: { Lines: { [n]: { BestLapTimes: { [part - 1]: { Value: d.LastLapTime.Value } } } } } });
+      }
+    }
+  }
   lines.push(...extra);
   lines.sort((a, b) => a.ms - b.ms);
 }

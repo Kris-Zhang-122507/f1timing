@@ -1,4 +1,4 @@
-import { stewards, driverStewarding } from "./stewards.js?v=mv4kitnd";
+import { stewards, driverStewarding } from "./stewards.js?v=mv4ol03x";
 // Turns raw timing state into what the page shows: a tidy driver list, battles,
 // a "what just happened" story and race control messages with plain-English notes.
 
@@ -121,6 +121,7 @@ export class Race {
     this.posHist = {};           // driver -> [{ lap, pos }] position at the end of each lap
     this.pendingOvertakes = [];  // waiting to be sure they weren't just a pit stop
     this.pitAt = {};             // driver -> last time seen in or leaving the pits
+    this.secBest = {};           // driver -> [s1, s2, s3] personal bests seen so far
     this.officialOvertakes = false; // replays from OpenF1 carry a list of real overtakes
     this.seenOvertakes = new Set();
     this.seenStops = new Set();
@@ -208,6 +209,14 @@ export class Race {
       if (!pitted) this.add("overtake", `${this.driverName(o.a)} passes ${this.driverName(o.b)} for P${o.pos}`, "", o.lap);
       return false;
     });
+
+    // personal best sector times as they happen (F1's own table only arrives now and then)
+    for (const [n, l] of Object.entries(lines)) {
+      list(l.Sectors).forEach((sec, i) => {
+        const v = parseFloat(sec?.Value);
+        if (v > 0 && v < 200) { const b = (this.secBest[n] ??= []); if (!(b[i] <= v)) b[i] = v; }
+      });
+    }
 
     const now = {};
     for (const [n, l] of Object.entries(lines)) {
@@ -383,7 +392,7 @@ export class Race {
         hist: this.lapHist[n] ?? [],
         posHist: this.posHist[n] ?? [],
         // whole-session bests from TimingStats
-        bestSectors: list(ts.BestSectors).map((x) => x?.Value ?? ""),
+        bestSectors: [0, 1, 2].map((i) => list(ts.BestSectors)[i]?.Value || (this.secBest[n]?.[i] ? this.secBest[n][i].toFixed(3) : "")),
         bestSpeeds: { i1: ts.BestSpeeds?.I1?.Value ?? "", i2: ts.BestSpeeds?.I2?.Value ?? "", fl: ts.BestSpeeds?.FL?.Value ?? "", st: ts.BestSpeeds?.ST?.Value ?? "" },
         // laps run in this race on each set = current tyre age minus its age when fitted
         stints: stints.map((s) => ({ c: (s.Compound ?? "?").charAt(0), laps: Math.max(0, (Number(s.TotalLaps) || 0) - (Number(s.StartLaps) || 0)), age: Number(s.TotalLaps) || 0, isNew: s.New === "true" || s.New === true })),
