@@ -33,3 +33,6 @@ in your browser. You should see some JSON with the words.
 - `F1 answered 403` — F1 is refusing Cloudflare's servers. The helper is set up right, but this
   route can't work; there's nothing more to fix on your side.
 - `Workers AI isn't connected` — redo step 4 (the name must be exactly `AI`).
+- `{"text":"","segments":[]}` — the clip arrived but no words came back. Open the same link with
+  `/debug` instead of `/transcribe` (`https://radio-helper.YOURNAME.workers.dev/debug?url=...`).
+  It shows how big the clip was, its first bytes, and what each speech model answered.
