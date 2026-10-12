@@ -2,8 +2,8 @@
 // once (tools/radio-helper.js). F1's server doesn't let websites read its radio clips, so the
 // helper fetches each clip and transcribes it with Whisper on Cloudflare. The page then works out
 // which lines are the driver and which are the team (and you can click a tag to correct it).
-import { label } from "./lib/speakers.js?v=mv507aov";
-const KEY = "undercut.transcripts.v5";
+import { label } from "./lib/speakers.js?v=mv5abrkn";
+const KEY = "undercut.transcripts.v6";
 const HELPER = "undercut.radioHelper";
 
 export const status = { error: null };
@@ -82,7 +82,7 @@ async function work(url) {
     ]);
     const segs = (tr.segments?.length ? tr.segments : [{ start: 0, end: audio ? audio.length / 16000 : 0, text: tr.text ?? "" }])
       .map((x) => ({ text: String(x.text ?? "").trim(), from: Number(x.start) || 0, to: Number(x.end) || 0, words: x.words }))
-      .filter((x) => x.text);
+      .filter((x) => x.text && !/team radio between a driver/i.test(x.text)); // Whisper repeating its hint on silence
     saved[url] = segs.length ? label(segs, audio, names.get(url) ?? "") : [{ who: null, text: "(no words picked up)" }];
     persist();
     pending.delete(url);

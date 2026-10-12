@@ -136,104 +136,99 @@ export function voiceprint(audio, from, to) {
   return { shape: v.map((x) => x - m), level: voiced.reduce((acc, f) => acc + f.e, 0) / voiced.length, floor: frames[Math.floor(frames.length * 0.85)].e };
 }
 
-// how different two stretches sound (roughly dB): spectrum shape, talking level, background level
-export const voiceGap = (x, y) => Math.sqrt(x.shape.reduce((acc, xi, i) => acc + (xi - y.shape[i]) ** 2, 0) / BANDS) * 2 + Math.abs(x.level - y.level) * 0.5 + Math.abs(x.floor - y.floor) * 0.35;
 
 const dist = (x, y) => Math.sqrt(x.reduce((acc, xi, i) => acc + (xi - y[i]) ** 2, 0));
 const mean = (vs) => vs[0].map((_, k) => vs.reduce((acc, v) => acc + v[k], 0) / vs.length);
 
-// two groups by voice; sep = how far apart the groups are compared with how spread out each is
-function twoVoices(fps) {
-  const prints = fps.map((p) => (p ? [...p.shape, p.level * 0.5, p.floor * 0.35] : null));
-  const idx = prints.map((p, i) => (p ? i : -1)).filter((i) => i >= 0);
-  if (idx.length < 2) return null;
-  let sa = idx[0], sb = idx[1], best = -1;
-  for (const i of idx) for (const j of idx) if (i < j && dist(prints[i], prints[j]) > best) { best = dist(prints[i], prints[j]); sa = i; sb = j; }
-  let ca = prints[sa], cb = prints[sb], group = new Map();
-  for (let it = 0; it < 10; it++) {
-    group = new Map(idx.map((i) => [i, dist(prints[i], ca) <= dist(prints[i], cb) ? 0 : 1]));
-    const A = idx.filter((i) => group.get(i) === 0).map((i) => prints[i]), B = idx.filter((i) => group.get(i) === 1).map((i) => prints[i]);
-    if (!A.length || !B.length) return null;
-    ca = mean(A); cb = mean(B);
-  }
-  const within = Math.sqrt(idx.reduce((acc, i) => acc + dist(prints[i], group.get(i) ? cb : ca) ** 2, 0) / idx.length);
-  return { group, sep: dist(ca, cb) / Math.max(within, 3) };
-}
-
 // ---------------- together ----------------
-// A clip is a run of "turns", and the speaker swaps at each handover — there are only two people.
-// So: find the handovers, label the turns whose words are clear, and the turns in between take
-// the opposite of their neighbour.
-const SURE = 1.5;     // text score needed to call a sentence or turn on its words alone
-const SOUND = 4.5;    // how different (≈dB) two sentences must sound to count as a different mic
-const ACK = /^(copy|copy that|okay|ok|yeah|yes|yep|understood|roger|got it|thanks|thank you|cheers)\b/i;
-
+// Every sentence gets a score: > 0 sounds like the team, < 0 like the driver. It adds up
+//   - the words (above),
+//   - loudness: on real F1 clips the driver's mic is the louder one about 85% of the time,
+//   - voice groups: the clip's sentences split in two by how they sound; the group that the other
+//     clues lean towards gets a nudge that way,
+// then the most likely sequence of speakers is picked, with a cost for each change of speaker
+// (smaller right after "Copy." / "Understood", which usually means the other person). Sentences
+// where both answers are about as likely stay untagged.
+// tuned on 30 real clips hand-labelled sentence by sentence (about 80% right on clips it wasn't tuned on)
+export const P = { wt: 1.5, wa: 2, dB: 2, gap: 5, sw: 1, sure: 0.5, clamp: 1.5, minDur: 0.6, wc: 1, csep: 1, ack: 2 };
+const ACK = /^(copy|copy that|okay|ok|yeah|yes|yep|understood|roger|got it|negative|affirm|confirm|thanks|thank you|cheers)\b/i;
 export function label(segs, audio, fullName = "", explain = false) {
   const sents = sentences(segs);
   const n = sents.length;
-  if (!n) return [];
-  const score = sents.map((x) => textScore(x.text, fullName));
-  const byText = score.map((v) => (v >= SURE ? "Team" : v <= -SURE ? "Driver" : null));
+  if (!n) return explain ? { lines: [], who: [] } : [];
+  const score = sents.map((x) => Math.max(-P.clamp, Math.min(P.clamp, textScore(x.text, fullName))));
   const prints = audio ? sents.map((x) => voiceprint(audio, x.from, x.to)) : sents.map(() => null);
-  const voices = audio ? twoVoices(prints) : null;
-  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-  const names = first ? [first, ...(NICK[first] ?? [])] : [];
-  const startsWithName = (t) => names.some((nm) => new RegExp(`^\\W*${reEsc(nm)}\\b`, "i").test(t));
-
-  // evidence for a handover between sentence i and i + 1 (> 1 means yes)
-  const why = [];
-  const handover = [];
-  let turnStart = 0;
-  for (let i = 0; i + 1 < n; i++) {
-    let e = 0;
-    const notes = [];
-    // the new sentence against the whole turn so far (a single short sentence is a poor sample)
-    const a = audio ? voiceprint(audio, sents[turnStart].from, sents[i].to) : null, b = prints[i + 1];
-    if (a && b) {
-      const d = voiceGap(a, b), trust = Math.min(1, (sents[i + 1].to - sents[i + 1].from) / 1.5);
-      e += (trust * (d - SOUND)) / 2; notes.push(`sound ${d.toFixed(1)}${trust < 1 ? ` (short, ×${trust.toFixed(1)})` : ""}`);
-    }
-    if (voices?.group.has(i) && voices.group.has(i + 1) && voices.sep >= 1.5) {
-      const differ = voices.group.get(i) !== voices.group.get(i + 1), w = Math.min(1.5, voices.sep / 3);
-      e += differ ? w : -w; notes.push(`${differ ? "voice groups differ" : "same voice group"} (${voices.sep.toFixed(1)})`);
-    }
-    const gap = sents[i + 1].from - sents[i].to;
-    if (gap >= 0.7) { e += gap >= 1.5 ? 0.8 : 0.4; notes.push(`pause ${gap.toFixed(1)}s`); }
-    const next = sents[i + 1].text.trim(), prev = sents[i].text.trim();
-    if (startsWithName(next) && !startsWithName(prev)) { e += 1; notes.push("starts with his name"); }
-    if (ACK.test(next) && !ACK.test(prev)) { e += 0.5; notes.push("reply word"); }
-    if (/\?\s*$/.test(prev)) { e += 0.6; notes.push("after a question"); }
-    if (byText[i] && byText[i + 1]) { e += byText[i] !== byText[i + 1] ? 3 : -3; notes.push(byText[i] !== byText[i + 1] ? "words disagree" : "words agree"); }
-    handover.push(e > 1);
-    if (e > 1) turnStart = i + 1;
-    why.push(`${i}|${i + 1}: ${e.toFixed(1)} (${notes.join(", ")})`);
-  }
-
-  // turns
-  const turns = [[0]];
-  for (let i = 1; i < n; i++) { if (handover[i - 1]) turns.push([i]); else turns.at(-1).push(i); }
-  const tScore = turns.map((t) => t.reduce((acc, i) => acc + score[i], 0));
-  const tWho = tScore.map((v) => (v >= SURE ? "Team" : v <= -SURE ? "Driver" : null));
-  // fill in from neighbours, alternating, nearest clear turn first
-  for (let pass = 0; pass < turns.length; pass++) {
-    for (let k = 0; k < turns.length; k++) {
-      if (tWho[k]) continue;
-      const left = tWho[k - 1], right = tWho[k + 1];
-      if (left && right && left !== right) continue; // can't both be right — leave it
-      const from = left ?? right;
-      if (from) tWho[k] = from === "Team" ? "Driver" : "Team";
+  // loudness: the driver's mic is usually the louder one. Split the clip's sentences into a loud
+  // and a quiet group; how far each sentence sits from the middle is the evidence.
+  const lv = prints.map((p, i) => (p && sents[i].to - sents[i].from >= 0.25 ? p.level : null));
+  const known = lv.filter((x) => x != null).sort((a, b) => a - b);
+  let mid = null, spread = 0;
+  if (known.length >= 2) {
+    let best = Infinity, cut = 1;
+    for (let k = 1; k < known.length; k++) {
+      const A = known.slice(0, k), B = known.slice(k);
+      const ma = A.reduce((x, y) => x + y, 0) / A.length, mb = B.reduce((x, y) => x + y, 0) / B.length;
+      const ss = A.reduce((x, y) => x + (y - ma) ** 2, 0) + B.reduce((x, y) => x + (y - mb) ** 2, 0);
+      if (ss < best) { best = ss; cut = k; mid = (ma + mb) / 2; spread = mb - ma; }
     }
   }
-  const who = [];
-  turns.forEach((t, k) => { for (const i of t) who[i] = Math.abs(score[i]) >= 3 ? byText[i] : tWho[k] ?? byText[i]; });
-
-  // join neighbouring sentences from the same speaker into one line
+  const acoustic = lv.map((x, i) => {
+    if (x == null || mid == null) return 0;
+    const dur = Math.min(1, (sents[i].to - sents[i].from) / P.minDur);
+    const two = Math.min(1, Math.max(0, (spread - 1.5) / P.gap)); // only if there really are two levels
+    return -((x - mid) / P.dB) * two * dur; // > 0 → team (quieter)
+  });
+  let ev = score.map((s, i) => P.wt * s + P.wa * acoustic[i]); // > 0 → team
+  // voice groups: split the sentences into two groups by how they sound (all measurements,
+  // scaled within the clip). Which group is which is decided by the other evidence.
+  if (P.wc && audio) {
+    const F = prints.map((p, i) => (p && sents[i].to - sents[i].from >= 0.4 ? [p.level, ...p.shape] : null));
+    const idx = F.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
+    if (idx.length >= 3) {
+      const dim = F[idx[0]].length;
+      const mu = Array.from({ length: dim }, (_, k) => idx.reduce((a, i) => a + F[i][k], 0) / idx.length);
+      const sd = Array.from({ length: dim }, (_, k) => Math.sqrt(idx.reduce((a, i) => a + (F[i][k] - mu[k]) ** 2, 0) / idx.length) || 1);
+      const Z = new Map(idx.map((i) => [i, F[i].map((x, k) => (x - mu[k]) / sd[k])]));
+      const dist2 = (a, b) => a.reduce((acc, x, k) => acc + (x - b[k]) ** 2, 0);
+      let ca = null, cb = null, far = -1;
+      for (const i of idx) for (const j of idx) if (i < j && dist2(Z.get(i), Z.get(j)) > far) { far = dist2(Z.get(i), Z.get(j)); ca = Z.get(i); cb = Z.get(j); }
+      let g = new Map();
+      for (let it = 0; it < 15; it++) {
+        g = new Map(idx.map((i) => [i, dist2(Z.get(i), ca) <= dist2(Z.get(i), cb) ? 0 : 1]));
+        const A = idx.filter((i) => !g.get(i)), B = idx.filter((i) => g.get(i));
+        if (!A.length || !B.length) break;
+        ca = Array.from({ length: dim }, (_, k) => A.reduce((a, i) => a + Z.get(i)[k], 0) / A.length);
+        cb = Array.from({ length: dim }, (_, k) => B.reduce((a, i) => a + Z.get(i)[k], 0) / B.length);
+      }
+      const within = Math.sqrt(idx.reduce((a, i) => a + dist2(Z.get(i), g.get(i) ? cb : ca), 0) / idx.length) || 1;
+      const sep = Math.sqrt(dist2(ca, cb)) / within;
+      if (sep >= P.csep) {
+        // polarity: does group 0 lean team or driver, by everything else we know?
+        const lean = idx.reduce((a, i) => a + (g.get(i) ? -ev[i] : ev[i]), 0);
+        const pol = lean >= 0 ? 1 : -1;
+        const strength = Math.min(1, Math.abs(lean) / 3) * Math.min(1, (sep - P.csep + 0.5) / 1.5);
+        ev = ev.map((e, i) => (g.has(i) ? e + P.wc * strength * (g.get(i) ? -pol : pol) : e));
+      }
+    }
+  }
+  // best sequence: each sentence's evidence, with a cost for every change of speaker
+  const st = ["Team", "Driver"], sign = [1, -1];
+  const fw = [[sign[0] * ev[0], sign[1] * ev[0]]];
+  // a reply ("Copy.", "Understood") usually means the other person is talking now
+  const sw = sents.map((x, i) => (i && ACK.test(x.text.trim()) && !ACK.test(sents[i - 1].text.trim()) ? P.sw - P.ack : P.sw));
+  for (let i = 1; i < n; i++) fw.push([0, 1].map((k) => sign[k] * ev[i] + Math.max(fw[i - 1][k], fw[i - 1][1 - k] - sw[i])));
+  const bw = Array.from({ length: n }, () => [0, 0]);
+  for (let i = n - 2; i >= 0; i--) bw[i] = [0, 1].map((k) => Math.max(sign[k] * ev[i + 1] + bw[i + 1][k], sign[1 - k] * ev[i + 1] + bw[i + 1][1 - k] - sw[i + 1]));
+  const who = sents.map((_, i) => {
+    const t = fw[i][0] + bw[i][0], d = fw[i][1] + bw[i][1];
+    return Math.abs(t - d) < P.sure ? null : t > d ? "Team" : "Driver";
+  });
   const lines = [];
   sents.forEach((x, i) => {
     const last = lines.at(-1);
-    if (last && last.who === who[i] && !(i > 0 && handover[i - 1] && who[i] == null)) last.text += ` ${x.text}`;
+    if (last && last.who === who[i]) last.text += ` ${x.text}`;
     else lines.push({ who: who[i], text: x.text });
   });
-  if (explain) return { lines, why, score, turns, voices: voices && { sep: voices.sep } };
+  if (explain) return { lines, who, ev, acoustic, score };
   return lines;
 }

@@ -34,7 +34,7 @@ async function transcribeBytes(env, bytes, debug = false) {
   const tried = [];
   try {
     const r = await env.AI.run(TURBO, { audio: toBase64(bytes), language: "en", initial_prompt: HINT });
-    const raw = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim(), words: words(s.words), no_speech_prob: s.no_speech_prob, avg_logprob: s.avg_logprob, compression_ratio: s.compression_ratio })).filter((s) => s.text && s.text !== HINT);
+    const raw = (r.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: String(s.text ?? "").trim(), words: words(s.words), no_speech_prob: s.no_speech_prob, avg_logprob: s.avg_logprob, compression_ratio: s.compression_ratio })).filter((s) => s.text && !/team radio between a driver/i.test(s.text)); // Whisper sometimes repeats the hint on silence
     const kept = raw.filter(real);
     const segments = kept.map(({ start, end, text, words }) => ({ start, end, text, ...(words ? { words } : {}) }));
     const text = segments.map((s) => s.text).join(" ");
