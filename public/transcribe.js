@@ -95,7 +95,7 @@ async function run() {
       catch (e) {
         // F1 (or the helper) said no: stop and explain, rather than trying every clip
         status.blocked = true;
-        status.error = helper() ? `The radio helper couldn't get the clip (${e.message}).` : null;
+        status.error = hasBridge() ? `The radio bridge couldn't get the clip (${e.message}).` : helper() ? `The radio helper couldn't get the clip (${e.message}).` : null;
         pending.set(url, "blocked");
         for (const u of queue.splice(0)) pending.set(u, "blocked");
         changed();
@@ -123,7 +123,25 @@ async function finish(url, audio) {
   changed();
 }
 
+// the radio bridge user script (radio-bridge.user.js) fetches clips for the page
+export const hasBridge = () => !!document.documentElement.getAttribute("data-undercut-bridge");
+let bridgeId = 0;
+function viaBridge(url) {
+  return new Promise((resolve, reject) => {
+    const id = `${Date.now()}-${bridgeId++}`;
+    const done = (e) => {
+      if (e.source !== window || e.data?.type !== "undercut-radio-got" || e.data.id !== id) return;
+      window.removeEventListener("message", done); clearTimeout(timer);
+      if (e.data.ok && e.data.data) resolve(e.data.data); else reject(new Error(`F1 answered ${e.data.status || "nothing"}`));
+    };
+    const timer = setTimeout(() => { window.removeEventListener("message", done); reject(new Error("the radio bridge didn't answer")); }, 35000);
+    window.addEventListener("message", done);
+    window.postMessage({ type: "undercut-radio-get", id, url }, "*");
+  });
+}
+
 async function download(url) {
+  if (hasBridge()) return toSamples(await viaBridge(url));
   const h = helper();
   const r = await fetch(h ? `${h}/?url=${encodeURIComponent(url)}` : url, { mode: "cors" });
   if (!r.ok) throw new Error(`clip HTTP ${r.status}`);

@@ -1,24 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4vc6yy";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4vc6yy";
-import { CircleView } from "./circle.js?v=mv4vc6yy";
-import { renderTyres } from "./tyres.js?v=mv4vc6yy";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4vc6yy";
-import { renderCompare } from "./compare.js?v=mv4vc6yy";
-import { renderRewind } from "./rewind.js?v=mv4vc6yy";
-import { renderDriver } from "./driver.js?v=mv4vc6yy";
-import { Player, parseRecording } from "./player.js?v=mv4vc6yy";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4vc6yy";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4vc6yy";
-import { Dashboard } from "./dash.js?v=mv4vc6yy";
-import { CarTelemetry } from "./telemetry.js?v=mv4vc6yy";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4vc6yy";
-import * as tx from "./transcribe.js?v=mv4vc6yy";
-import { renderKnockout } from "./quali.js?v=mv4vc6yy";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv4vc6yy";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4vc6yy";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4vc6yy";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4vc6yy";
+import { LiveState } from "./lib/state.js?v=mv4vn4ni";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4vn4ni";
+import { CircleView } from "./circle.js?v=mv4vn4ni";
+import { renderTyres } from "./tyres.js?v=mv4vn4ni";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4vn4ni";
+import { renderCompare } from "./compare.js?v=mv4vn4ni";
+import { renderRewind } from "./rewind.js?v=mv4vn4ni";
+import { renderDriver } from "./driver.js?v=mv4vn4ni";
+import { Player, parseRecording } from "./player.js?v=mv4vn4ni";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4vn4ni";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4vn4ni";
+import { Dashboard } from "./dash.js?v=mv4vn4ni";
+import { CarTelemetry } from "./telemetry.js?v=mv4vn4ni";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4vn4ni";
+import * as tx from "./transcribe.js?v=mv4vn4ni";
+import { renderKnockout } from "./quali.js?v=mv4vn4ni";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv4vn4ni";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4vn4ni";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4vn4ni";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4vn4ni";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -816,12 +816,19 @@ function txCard() {
   const s = tx.status;
   const mb = (b) => `${Math.round(b / 1e6)} MB`;
   if (s.state === "ready" && s.blocked) return `<div class="tx-card small">
-      <div>F1's server won't let websites read its radio clips, so transcripts need a free <b>radio helper</b> — a tiny Cloudflare Worker you set up once (about 5 minutes, no card needed). <a href="https://github.com/Kris-Zhang-122507/f1timing/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener">How to set it up</a></div>
+      <div>F1's server won't let websites read its radio clips. To transcribe them, add the free <b>radio bridge</b> to your browser (about 2 minutes, once):</div>
       ${s.error ? `<div class="tx-err">${esc(s.error)}</div>` : ""}
-      <form class="tx-helper" id="txHelperForm"><label class="sr" for="txHelper">Radio helper address</label>
-        <input id="txHelper" placeholder="https://radio-helper.yourname.workers.dev" value="${esc(tx.helper())}" autocomplete="off">
-        <button class="btn primary" type="submit">Save</button></form></div>`;
-  if (s.state === "ready") return `<div class="tx-card ok small">Speech model ready — new clips are transcribed automatically.</div>`;
+      <ol class="tx-steps">
+        <li>Install <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a> (a free browser add-on for small scripts). In Chrome, open its details page and turn on <b>Allow user scripts</b>.</li>
+        <li><a href="radio-bridge.user.js" target="_blank" rel="noopener"><b>Install the Undercut radio bridge</b></a> and press Install.</li>
+        <li>Reload this page.</li>
+      </ol>
+      <details class="tx-alt"><summary class="muted">Or use a radio helper on Cloudflare instead</summary>
+        <div class="muted">For browsers without add-ons. <a href="https://github.com/Kris-Zhang-122507/f1timing/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener">How to set it up</a></div>
+        <form class="tx-helper" id="txHelperForm"><label class="sr" for="txHelper">Radio helper address</label>
+          <input id="txHelper" placeholder="https://radio-helper.yourname.workers.dev" value="${esc(tx.helper())}" autocomplete="off">
+          <button class="btn" type="submit">Save</button></form></details></div>`;
+  if (s.state === "ready") return `<div class="tx-card ok small">Speech model ready${tx.hasBridge() ? " · radio bridge on" : ""} — new clips are transcribed automatically.</div>`;
   if (s.state === "loading") return `<div class="tx-card small"><div>Downloading the speech model${s.total ? ` — ${mb(s.loaded)} of ${mb(s.total)}` : "…"}</div>
       <div class="tx-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.progress * 100)}"><i style="width:${(s.progress * 100).toFixed(1)}%"></i></div>
       <div class="muted">Only needed once — your browser keeps it for next time.</div></div>`;
