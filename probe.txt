@@ -1,0 +1,20 @@
+403 919 | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36
+403 919 | BestHTTP
+403 919 | curl/8
+HTTP/2 403 
+server: CloudFront
+date: Mon, 12 Oct 2026 03:19:25 GMT
+content-type: text/html
+content-length: 919
+x-cache: Error from cloudfront
+via: 1.1 82b6251dbe2da311f6b88d87bb8855aa.cloudfront.net (CloudFront)
+x-amz-cf-pop: ORD56-P16
+x-amz-cf-id: 6OTbP5pO8Ro7pLeO2Cgzy5F3ip5qRLF8uRrruo06NCZu5kxIEuWUIg==
+x-xss-protection: 1
+x-frame-options: SAMEORIGIN
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+strict-transport-security: max-age=31536000
+cache-control: max-age=3600
+vary: Origin
+
