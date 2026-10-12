@@ -4,7 +4,7 @@
 // It only fetches F1 team radio .mp3 files, and only for your Undercut site.
 //
 // Set up: see tools/RADIO-HELPER.md
-const SITE = "https://kris-zhang-122507.github.io"; // your Undercut site (no trailing slash)
+const SITE = "https://kris-zhang-122507.github.io/f1timing/public/"; // your Undercut site (no trailing slash)
 const CLIP = /^https:\/\/livetiming\.formula1\.com\/static\/[\w\-./%]+\/TeamRadio\/[\w\-.%]+\.mp3$/;
 
 export default {
