@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/gridstack/gridstack.min.css">
 <link rel="stylesheet" href="vendor/gridstack/gridstack-24.css">
-<link rel="stylesheet" href="style.css?v=mv4g7znc">
+<link rel="stylesheet" href="style.css?v=mv4hrnq5">
 </head>
 <body>
 <div class="edge" id="edge" aria-hidden="true"></div><div class="edge-pulse" id="edgePulse" aria-hidden="true"></div>
@@ -25,6 +25,16 @@
     <div class="mono muted small" id="weather"></div>
     <div class="spacer"></div>
     <div class="conn" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></div>
+    <details class="menu delay" id="delayMenu">
+      <summary id="delaySum" title="Hold the timing back so it matches your TV or stream">TV delay: off</summary>
+      <div class="menu-list delay-box">
+        <div class="delay-row"><label for="delayRange">Delay</label><input type="range" id="delayRange" min="0" max="120" step="1" value="0"><span class="mono" id="delayVal">0 s</span></div>
+        <div class="delay-row btns"><button type="button" data-d="-5">−5</button><button type="button" data-d="-1">−1</button><button type="button" data-d="1">+1</button><button type="button" data-d="5">+5</button><button type="button" data-d="0" id="delayOff">Off</button></div>
+        <button type="button" class="delay-sync" id="syncLap">The lap counter just changed on my TV</button>
+        <button type="button" class="delay-sync" id="syncStart">The lights just went out on my TV</button>
+        <div class="menu-note muted small" id="delayNote">Live timing runs ahead of TV and streams. Press a button the moment it happens on your screen, or drag the slider, and the whole site waits to match.</div>
+      </div>
+    </details>
     <div class="rec">
       <label class="btn">Load recording<input type="file" id="recFile" accept=".jsonl,.json,.txt" hidden></label>
     </div>
@@ -200,6 +210,16 @@
       <div class="w-body" data-slot="driver"></div>
     </section>
 
+    <section class="w" id="w-stewards" data-title="Stewards">
+      <header class="w-head"><h2>Stewards</h2><span class="muted small">penalties · investigations · track limits</span></header>
+      <div class="w-body"><div id="stewards"></div></div>
+    </section>
+
+    <section class="w" id="w-pitwin" data-title="Pit window">
+      <header class="w-head"><h2>Pit window</h2><span class="muted small">undercut / overcut calls</span></header>
+      <div class="w-body"><div id="pitwin"></div></div>
+    </section>
+
     <section class="w" id="w-car" data-title="Car telemetry">
       <header class="w-head"><h2>Car telemetry</h2></header>
       <div class="w-body"><div id="carTele"></div></div>
@@ -213,6 +233,6 @@
   <footer class="muted small">Unofficial fan project. Not associated with Formula 1. Data from F1 live timing.</footer>
 </div>
 <script src="vendor/gridstack/gridstack-all.js"></script>
-<script type="module" src="app.js?v=mv4g7znc"></script>
+<script type="module" src="app.js?v=mv4hrnq5"></script>
 </body>
 </html>

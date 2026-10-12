@@ -68,5 +68,32 @@ export function renderSchedule(races, now = Date.now()) {
       ${next ? `<div class="sch-next">Next: <b>${esc(next.name)}</b> ${countdown(next.start.getTime() - now)}</div>` : ""}
       <div class="sch-list">${rows}</div>
     </section>
-    <section class="card"><h2>${races.length} race weekends this season</h2><div class="sch-grid">${season}</div></section>`;
+    <section class="card"><div class="card-head"><h2>${races.length} race weekends this season</h2>
+      <div class="filters"><button id="icsAll" title="Every session left this season, with a reminder 15 minutes before">Add to my calendar</button><button id="icsRaces" title="Races and sprints only">Races only</button></div></div>
+      <div class="sch-grid">${season}</div>
+      <p class="muted small">Downloads a calendar file — open it on your phone or computer, or import it into Google Calendar. Times are set correctly for wherever you are.</p></section>`;
+}
+
+// A calendar file (.ics) of the sessions still to come, each with a 15-minute reminder.
+export function calendarFile(races, { racesOnly = false, now = Date.now() } = {}) {
+  const stamp = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const length = { "Race": 120, "Sprint": 60, "Qualifying": 60, "Sprint Qualifying": 45 };
+  const events = [];
+  for (const r of races) for (const s of r.sessions) {
+    if (s.start.getTime() < now - 3 * 3600e3) continue;
+    if (racesOnly && !/^(Race|Sprint)$/.test(s.name)) continue;
+    const end = new Date(s.start.getTime() + (length[s.name] ?? 60) * 60e3);
+    events.push([
+      "BEGIN:VEVENT",
+      `UID:undercut-${r.round}-${s.name.replace(/\s+/g, "-").toLowerCase()}@undercut`,
+      `DTSTAMP:${stamp(new Date())}`,
+      `DTSTART:${stamp(s.start)}`,
+      `DTEND:${stamp(end)}`,
+      `SUMMARY:F1 ${r.name.replace(/ Grand Prix$/, " GP")} — ${s.name}`,
+      `LOCATION:${[r.circuit, r.locality, r.country].filter(Boolean).join(", ").replace(/,/g, "\\,")}`,
+      "BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", `DESCRIPTION:${s.name} starts in 15 minutes`, "END:VALARM",
+      "END:VEVENT",
+    ].join("\r\n"));
+  }
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Undercut//F1 schedule//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:F1 sessions", ...events, "END:VCALENDAR"].join("\r\n") + "\r\n";
 }

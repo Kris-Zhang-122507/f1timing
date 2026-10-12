@@ -1,3 +1,4 @@
+import { stewards, driverStewarding } from "./stewards.js?v=mv4hrnq5";
 // Turns raw timing state into what the page shows: a tidy driver list, battles,
 // a "what just happened" story and race control messages with plain-English notes.
 
@@ -332,6 +333,7 @@ export class Race {
     const noEntries = list(d.TimingData?.NoEntries).map(Number);
     const isQuali = /Qualifying|Shootout/i.test(`${d.SessionInfo?.Type ?? ""} ${d.SessionInfo?.Name ?? ""}`);
 
+    const stewarding = stewards(list(d.RaceControlMessages?.Messages));
     const rows = Object.entries(lines).map(([n, l]) => {
       const info = drivers[n] ?? {};
       const stats = list(l.Stats);
@@ -377,6 +379,7 @@ export class Race {
         lapStart: this.lapStart[n] ?? null,
         intHist: this.intervalHist[n] ?? [],
         pitTimes: this.pitTimes[n] ?? [],
+        stw: driverStewarding(stewarding, n),
         hist: this.lapHist[n] ?? [],
         posHist: this.posHist[n] ?? [],
         // whole-session bests from TimingStats
@@ -435,6 +438,7 @@ export class Race {
       rows,
       battles,
       story: this.story.slice(-40).reverse(),
+      stewards: stewarding,
       rcm,
       radio,
       messages: this.state.messages,
