@@ -14,6 +14,7 @@ export function parseRecording(text) {
     else if (m.topic) lines.push({ ms, topic: m.topic, data: m.data });
   }
   lines.sort((a, b) => a.ms - b.ms);
+  spreadMinisectors(lines);
   // Clean up two quirks in older replay files: a lap counter that briefly goes backwards,
   // and the chequered flag being mistaken for a red flag.
   let maxLap = 0;
@@ -25,6 +26,36 @@ export function parseRecording(text) {
     if (l.topic === "TrackStatus" && String(l.data?.Status) === "5" && /CHEQUERED/i.test(l.data?.Message ?? "")) return false;
     return true;
   });
+}
+
+// Archived replays (built from OpenF1) only know each sector's minisectors once the sector is
+// finished, so they'd all light up at once. Live F1 fills them in one by one as the car goes
+// round — so spread them out across the sector's time. Recordings of live sessions already
+// have them one by one (sent as small updates), and are left alone.
+function spreadMinisectors(lines) {
+  const live = lines.some((l) => l.topic === "TimingData" && Object.values(l.data?.Lines ?? {}).some((d) =>
+    Object.values(d?.Sectors ?? {}).some((sec) => sec?.Segments && !Array.isArray(sec.Segments))));
+  if (live) return;
+  const extra = [];
+  for (const l of lines) {
+    if (l.topic !== "TimingData") continue;
+    for (const [n, d] of Object.entries(l.data?.Lines ?? {})) {
+      for (const [i, sec] of Object.entries(d?.Sectors ?? {})) {
+        const v = parseFloat(sec?.Value);
+        const segs = sec?.Segments;
+        if (!Array.isArray(segs) || !segs.length || !(v > 0) || segs.every((g) => !g?.Status)) continue;
+        const start = l.ms - v * 1000, k = segs.length;
+        // this sector's minisectors start empty, then fill in left to right
+        extra.push({ ms: start + 1, topic: "TimingData", data: { Lines: { [n]: { Sectors: { [i]: { Segments: segs.map(() => ({ Status: 0 })) } } } } } });
+        for (let j = 0; j < k - 1; j++) {
+          extra.push({ ms: start + ((j + 1) / k) * v * 1000, topic: "TimingData", data: { Lines: { [n]: { Sectors: { [i]: { Segments: { [j]: { Status: segs[j]?.Status ?? 0 } } } } } } } });
+        }
+      }
+    }
+  }
+  if (!extra.length) return;
+  lines.push(...extra);
+  lines.sort((a, b) => a.ms - b.ms);
 }
 
 // Things worth marking on the timeline, found by skimming the recording once.

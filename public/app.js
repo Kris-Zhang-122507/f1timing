@@ -1,21 +1,21 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4k5bct";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4k5bct";
-import { CircleView } from "./circle.js?v=mv4k5bct";
-import { renderTyres } from "./tyres.js?v=mv4k5bct";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4k5bct";
-import { renderCompare } from "./compare.js?v=mv4k5bct";
-import { renderRewind } from "./rewind.js?v=mv4k5bct";
-import { renderDriver } from "./driver.js?v=mv4k5bct";
-import { Player, parseRecording } from "./player.js?v=mv4k5bct";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4k5bct";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4k5bct";
-import { Dashboard } from "./dash.js?v=mv4k5bct";
-import { CarTelemetry } from "./telemetry.js?v=mv4k5bct";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4k5bct";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4k5bct";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4k5bct";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4k5bct";
+import { LiveState } from "./lib/state.js?v=mv4kd7kf";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4kd7kf";
+import { CircleView } from "./circle.js?v=mv4kd7kf";
+import { renderTyres } from "./tyres.js?v=mv4kd7kf";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4kd7kf";
+import { renderCompare } from "./compare.js?v=mv4kd7kf";
+import { renderRewind } from "./rewind.js?v=mv4kd7kf";
+import { renderDriver } from "./driver.js?v=mv4kd7kf";
+import { Player, parseRecording } from "./player.js?v=mv4kd7kf";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4kd7kf";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4kd7kf";
+import { Dashboard } from "./dash.js?v=mv4kd7kf";
+import { CarTelemetry } from "./telemetry.js?v=mv4kd7kf";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4kd7kf";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4kd7kf";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4kd7kf";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4kd7kf";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
