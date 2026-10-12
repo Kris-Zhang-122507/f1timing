@@ -1,21 +1,21 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv4k2wrh";
-import { Race, lapSeconds } from "./lib/race.js?v=mv4k2wrh";
-import { CircleView } from "./circle.js?v=mv4k2wrh";
-import { renderTyres } from "./tyres.js?v=mv4k2wrh";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4k2wrh";
-import { renderCompare } from "./compare.js?v=mv4k2wrh";
-import { renderRewind } from "./rewind.js?v=mv4k2wrh";
-import { renderDriver } from "./driver.js?v=mv4k2wrh";
-import { Player, parseRecording } from "./player.js?v=mv4k2wrh";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4k2wrh";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4k2wrh";
-import { Dashboard } from "./dash.js?v=mv4k2wrh";
-import { CarTelemetry } from "./telemetry.js?v=mv4k2wrh";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4k2wrh";
-import { loadStandings, renderStandings } from "./standings.js?v=mv4k2wrh";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4k2wrh";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4k2wrh";
+import { LiveState } from "./lib/state.js?v=mv4k5bct";
+import { Race, lapSeconds } from "./lib/race.js?v=mv4k5bct";
+import { CircleView } from "./circle.js?v=mv4k5bct";
+import { renderTyres } from "./tyres.js?v=mv4k5bct";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv4k5bct";
+import { renderCompare } from "./compare.js?v=mv4k5bct";
+import { renderRewind } from "./rewind.js?v=mv4k5bct";
+import { renderDriver } from "./driver.js?v=mv4k5bct";
+import { Player, parseRecording } from "./player.js?v=mv4k5bct";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv4k5bct";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv4k5bct";
+import { Dashboard } from "./dash.js?v=mv4k5bct";
+import { CarTelemetry } from "./telemetry.js?v=mv4k5bct";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv4k5bct";
+import { loadStandings, renderStandings } from "./standings.js?v=mv4k5bct";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv4k5bct";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv4k5bct";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -135,7 +135,7 @@ function connectDirect() {
       if (m.type === 1 && m.target === "feed") { gotData = true; liveIn(m.arguments[0], m.arguments[1]); saveLocal(m.arguments[0], m.arguments[1]); }
       else if (m.type === 3 && m.invocationId === "0") {
         if (m.error) engine.status = `F1 refused the subscription: ${m.error}`;
-        else { gotData = true; for (const [t, d] of Object.entries(m.result ?? {})) { liveIn(t, d); saveLocal(t, d); } engine.status = "Live · direct from F1"; }
+        else { gotData = true; for (const [t, d] of Object.entries(m.result ?? {})) { liveIn(t, d, true); saveLocal(t, d); } engine.status = "Live · direct from F1"; }
       } else if (m.type === 7) engine.status = `F1 closed the connection${m.error ? ": " + m.error : ""}`;
     }
   };
@@ -155,16 +155,26 @@ function connectDirect() {
 let tvDelay = 0;
 try { tvDelay = Math.max(0, Math.min(600, Number(localStorage.getItem("undercut.tvDelay")) || 0)); } catch {}
 const delayedMsgs = [];   // direct-from-F1 messages waiting to be shown
+// what live timing says right now, ignoring the delay (for matching against your TV)
+function liveView() {
+  if (useServer) return delayedViews.at(-1)?.v ?? view;
+  const lapNow = Math.max(0, ...Object.keys(arrivals.laps).map(Number), Number(engine?.state?.data?.LapCount?.CurrentLap) || 0, ...delayedMsgs.filter((m) => m.topic === "LapCount").map((m) => Number(m.data?.CurrentLap) || 0));
+  return lapNow ? { lap: lapNow, refLap: view?.refLap } : null;
+}
 const delayedViews = [];  // ready-made views from the Undercut server, waiting
 const arrivals = { start: null, lap: null, laps: {} }; // when lights out / each lap change reached us (undelayed)
 function noteArrival(topicOrView, data) {
   if (typeof topicOrView === "string") {
     if (topicOrView === "SessionStatus" && data?.Status === "Started") arrivals.start = Date.now();
     if (topicOrView === "LapCount" && data?.CurrentLap) { arrivals.lap = Date.now(); arrivals.laps[data.CurrentLap] ??= Date.now(); }
-  } else if (topicOrView?.lap && topicOrView.lap !== noteArrival.lastLap) { noteArrival.lastLap = topicOrView.lap; arrivals.lap = Date.now(); arrivals.laps[topicOrView.lap] ??= Date.now(); }
+  } else if (topicOrView?.lap && topicOrView.lap !== noteArrival.lastLap) {
+    // the first view after connecting is mid-lap: we don't know when that lap began
+    if (noteArrival.lastLap != null) { arrivals.lap = Date.now(); arrivals.laps[topicOrView.lap] ??= Date.now(); }
+    noteArrival.lastLap = topicOrView.lap;
+  }
 }
-function liveIn(topic, data) {
-  noteArrival(topic, data);
+function liveIn(topic, data, snapshot = false) {
+  if (!snapshot) noteArrival(topic, data);
   if (!tvDelay && !delayedMsgs.length) return feed(topic, data);
   delayedMsgs.push({ at: Date.now(), topic, data });
 }
@@ -198,14 +208,15 @@ $("delayLapForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const lap = Number($("delayLap").value);
   if (!lap) { $("delayLap").focus(); return; }
-  const known = Object.keys(arrivals.laps).map(Number).sort((a, b) => a - b);
-  if (!arrivals.laps[lap]) {
-    $("delayNote").textContent = known.length
-      ? `This page has seen laps ${known[0]}–${known[known.length - 1]} start. Pick one of those, or wait for the next lap change on your TV.`
-      : "No lap changes seen yet — keep the page open until the race is running, then try again.";
-    return;
-  }
-  syncTo(arrivals.laps[lap], `lap ${lap}`);
+  const live = liveView();
+  if (!live?.lap) { $("delayNote").textContent = "There's no live race running right now, so there's nothing to match yet. During a race, type the lap your TV shows the moment its lap counter changes."; return; }
+  if (lap > live.lap) { $("delayNote").textContent = `Live timing is only on lap ${live.lap} — your TV can't be ahead of it. Check the lap number?`; return; }
+  if (arrivals.laps[lap]) return syncTo(arrivals.laps[lap], `lap ${lap}`);
+  // not seen by this page (it was opened later): estimate from the typical lap time
+  const ref = live.refLap || 95;
+  const sinceCurrent = arrivals.laps[live.lap] ? (Date.now() - arrivals.laps[live.lap]) / 1000 : ref / 2;
+  setDelay(sinceCurrent + (live.lap - lap) * ref);
+  $("delayNote").textContent = `Estimated ${tvDelay}s from lap times (this page opened after lap ${lap} began). Fine-tune with ±1, or press Match again at the next lap change for an exact match.`;
 });
 // suggest the lap your TV is probably on
 $("delayMenu").addEventListener("toggle", () => {
@@ -264,7 +275,7 @@ async function flushLocal() {
   } catch (e) { console.warn("Couldn't save locally", e); }
 }
 setInterval(flushLocal, 5000);
-if (params.has("debug")) window.undercut = { saveLocal, flushLocal, localSessions, newEngine, feed, liveIn: (t, d) => liveIn(t, d), get engine() { return engine; } };
+if (params.has("debug")) window.undercut = { saveLocal, flushLocal, localSessions, newEngine, feed, liveIn: (t, d, s) => liveIn(t, d, s), get engine() { return engine; } };
 window.addEventListener("pagehide", flushLocal);
 
 async function localSessions() {
