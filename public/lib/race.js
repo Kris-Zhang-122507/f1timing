@@ -1,4 +1,4 @@
-import { stewards, driverStewarding } from "./stewards.js?v=mv5abrkn";
+import { stewards, driverStewarding } from "./stewards.js?v=mv772d34";
 // Turns raw timing state into what the page shows: a tidy driver list, battles,
 // a "what just happened" story and race control messages with plain-English notes.
 
@@ -427,6 +427,15 @@ export class Race {
       note: explain(m.Message ?? ""),
     }));
 
+    // every race control message by lap (for the lap strip's hover card), minus blue-flag noise
+    const rcLaps = {};
+    for (const m of list(d.RaceControlMessages?.Messages)) {
+      const lap = Number(m?.Lap) || 0, t = String(m?.Message ?? "");
+      if (!lap || !t || /BLUE FLAG/i.test(t)) continue;
+      const arr = (rcLaps[lap] ??= []);
+      if (arr.length < 8 && !arr.some((x) => x.text === t)) arr.push({ text: t, flag: flagColour(m), cat: categoryOf(m) });
+    }
+
     const clock = d.ExtrapolatedClock ?? {};
     const w = d.WeatherData ?? {};
     const track = String(d.TrackStatus?.Status ?? "1");
@@ -444,6 +453,7 @@ export class Race {
       clock: { remaining: clock.Remaining ?? "", utc: clock.Utc ?? "", running: !!clock.Extrapolating },
       weather: { air: w.AirTemp ?? "", track: w.TrackTemp ?? "", humidity: w.Humidity ?? "", wind: w.WindSpeed ?? "", rain: w.Rainfall === "1" || w.Rainfall === 1 },
       lapEvents: this.lapHistory(),
+      rcLaps,
       rows,
       battles,
       story: this.story.slice(-40).reverse(),

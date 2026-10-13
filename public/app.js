@@ -1,24 +1,24 @@
 // Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv5abrkn";
-import { Race, lapSeconds } from "./lib/race.js?v=mv5abrkn";
-import { CircleView } from "./circle.js?v=mv5abrkn";
-import { renderTyres } from "./tyres.js?v=mv5abrkn";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv5abrkn";
-import { renderCompare } from "./compare.js?v=mv5abrkn";
-import { renderRewind } from "./rewind.js?v=mv5abrkn";
-import { renderDriver } from "./driver.js?v=mv5abrkn";
-import { Player, parseRecording } from "./player.js?v=mv5abrkn";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv5abrkn";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv5abrkn";
-import { Dashboard } from "./dash.js?v=mv5abrkn";
-import { CarTelemetry } from "./telemetry.js?v=mv5abrkn";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv5abrkn";
-import * as tx from "./transcribe.js?v=mv5abrkn";
-import { renderKnockout } from "./quali.js?v=mv5abrkn";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv5abrkn";
-import { loadStandings, renderStandings } from "./standings.js?v=mv5abrkn";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv5abrkn";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv5abrkn";
+import { LiveState } from "./lib/state.js?v=mv772d34";
+import { Race, lapSeconds } from "./lib/race.js?v=mv772d34";
+import { CircleView } from "./circle.js?v=mv772d34";
+import { renderTyres } from "./tyres.js?v=mv772d34";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv772d34";
+import { renderCompare } from "./compare.js?v=mv772d34";
+import { renderRewind } from "./rewind.js?v=mv772d34";
+import { renderDriver } from "./driver.js?v=mv772d34";
+import { Player, parseRecording } from "./player.js?v=mv772d34";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv772d34";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv772d34";
+import { Dashboard } from "./dash.js?v=mv772d34";
+import { CarTelemetry } from "./telemetry.js?v=mv772d34";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv772d34";
+import * as tx from "./transcribe.js?v=mv772d34";
+import { renderKnockout } from "./quali.js?v=mv772d34";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv772d34";
+import { loadStandings, renderStandings } from "./standings.js?v=mv772d34";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv772d34";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv772d34";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -605,11 +605,85 @@ function renderStrip(v) {
     const ev = v.lapEvents[i];
     // a lap that's happened is blue unless something happened on it; the current lap is outlined
     const cls = [ev ?? (i < v.lap ? "done" : ""), i === v.lap ? "now" : ""].join(" ");
-    const label = ev === "sc" ? "safety car / VSC" : ev === "red" ? "red flag" : ev === "yellow" ? "yellow flag" : ev === "pits" ? "lots of pit stops" : "";
-    html += `<span class="${cls}" title="Lap ${i}${i === v.lap ? " (now)" : ""}${label ? ": " + label : ""}"></span>`;
+    html += `<span class="${cls}" data-lap="${i}"></span>`;
   }
-  $("lapStrip").innerHTML = html;
+  if (html !== stripHtml) {
+    stripHtml = html;
+    $("lapStrip").innerHTML = html;
+    if (stripHover) $("lapStrip").querySelector(`[data-lap="${stripHover}"]`)?.classList.add("hover");
+  }
+  if (stripHover) showLapCard(stripHover);
 }
+
+// ---------- lap strip hover card: what happened on that lap ----------
+let stripHtml = "", stripHover = null;
+const LAPSTATE = { sc: ["Safety car / VSC", "sc"], red: ["Red flag", "red"], yellow: ["Yellow flag", "yellow"], pits: ["Lots of pit stops", "pits"] };
+function lapCard(v, i) {
+  const ev = v.lapEvents[i];
+  const future = i > v.lap, now = i === v.lap;
+  const [stateText, stateCls] = LAPSTATE[ev] ?? (future ? ["To come", "future"] : now ? ["Racing", "green"] : ["Green", "green"]);
+  const chip = (r, extra = "") => `<span class="lc-chip"><i style="background:${esc(r?.colour ?? "#888")}"></i>${esc(r?.tla ?? "?")}${extra}</span>`;
+  const byN = new Map(v.rows.map((r) => [r.n, r]));
+  const parts = [];
+  if (future) {
+    parts.push(`<div class="lc-line muted">${i - v.lap} lap${i - v.lap === 1 ? "" : "s"} from now · ${v.totalLaps - i + 1} to go at the start of it</div>`);
+  } else {
+    const leader = v.rows.find((r) => r.posHist?.some((h) => h.lap === i && h.pos === 1));
+    if (leader) parts.push(`<div class="lc-line"><span class="lc-k">Leader</span>${chip(leader)}</div>`);
+    let fast = null;
+    for (const r of v.rows) for (const h of r.hist ?? []) if (h.lap === i && h.s && (!fast || h.s < fast.s)) fast = { r, s: h.s, tyre: h.tyre };
+    if (fast) parts.push(`<div class="lc-line"><span class="lc-k">Fastest</span>${chip(fast.r)}<span class="mono">${fmtLap(fast.s)}</span>${fast.tyre && fast.tyre !== "?" ? `<span class="tyre sm ${esc(fast.tyre)}">${esc(fast.tyre)}</span>` : ""}</div>`);
+    const pits = v.rows.flatMap((r) => (r.pitTimes ?? []).filter((p) => p.lap === i).map((p) => ({ r, dur: p.dur })));
+    if (pits.length) parts.push(`<div class="lc-line wrap"><span class="lc-k">Pit stops</span>${pits.map((p) => chip(p.r, `<span class="muted"> ${p.dur.toFixed(1)}s</span>`)).join("")}</div>`);
+    const happened = (v.story ?? []).filter((e) => e.lap === i && ["overtake", "out", "red", "sc", "green"].includes(e.type)).slice(0, 5);
+    if (happened.length) parts.push(`<ul class="lc-list">${happened.map((e) => `<li class="lc-ev ${esc(e.type)}">${esc(e.head)}</li>`).join("")}</ul>`);
+    const rc = (v.rcLaps?.[i] ?? []).slice(0, 4);
+    if (rc.length) parts.push(`<div class="lc-k lc-sub">Race control</div><ul class="lc-list">${rc.map((m) => `<li class="lc-rc ${esc(m.flag ?? "")}">${esc(sentenceCase(m.text))}</li>`).join("")}</ul>`);
+    const radios = (v.radio ?? []).filter((c) => c.lap === i);
+    if (radios.length) parts.push(`<div class="lc-line wrap"><span class="lc-k">Radio</span>${radios.slice(0, 6).map((c) => chip(byN.get(c.n) ?? c)).join("")}</div>`);
+    if (!parts.length) parts.push(`<div class="lc-line muted">${now ? "Under way — details fill in as the lap finishes." : "Nothing recorded for this lap (the page may not have been open then)."}</div>`);
+  }
+  const canJump = v.mode === "replay" && player?.laps?.some((x) => x.lap === i);
+  return `<div class="lc-head"><b>Lap ${i}</b><span class="muted">/ ${v.totalLaps}</span>${now ? `<span class="lc-now">NOW</span>` : ""}<span class="lc-state ${stateCls}">${stateText}</span></div>
+    ${parts.join("")}${canJump ? `<div class="lc-foot">Click to jump to this lap</div>` : ""}`;
+}
+const fmtLap = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}` : s.toFixed(3));
+// race control shouts in capitals: make it readable, keeping driver codes and abbreviations
+const sentenceCase = (t) => String(t).toLowerCase()
+  .replace(/(^|[.!?]\s+)([a-z])/g, (m, a, b) => a + b.toUpperCase())
+  .replace(/\(([a-z]{3})\)/g, (m, c) => `(${c.toUpperCase()})`)
+  .replace(/\bturn (\d+)/g, "Turn $1")
+  .replace(/\b(drs|vsc|sc|fia|pu|cet|utc)\b/gi, (x) => x.toUpperCase());
+function showLapCard(i) {
+  const pop = $("lapPop"), strip = $("lapStrip"), seg = strip.querySelector(`[data-lap="${i}"]`);
+  if (!view || !seg) return hideLapCard();
+  pop.innerHTML = lapCard(view, i);
+  pop.hidden = false;
+  // sit above the lap, kept inside the card
+  const card = $("stripCard").getBoundingClientRect(), r = seg.getBoundingClientRect();
+  const w = pop.offsetWidth;
+  const x = Math.max(8, Math.min(card.width - w - 8, r.left - card.left + r.width / 2 - w / 2));
+  pop.style.left = `${x}px`;
+  pop.style.setProperty("--arrow", `${r.left - card.left + r.width / 2 - x}px`);
+}
+function hideLapCard() { $("lapPop").hidden = true; stripHover = null; for (const x of $("lapStrip").children) x.classList.remove("hover"); }
+$("lapStrip").addEventListener("pointerover", (e) => {
+  const seg = e.target.closest("[data-lap]");
+  if (!seg) return;
+  const i = Number(seg.dataset.lap);
+  if (i === stripHover) return;
+  stripHover = i;
+  for (const x of $("lapStrip").children) x.classList.toggle("hover", x === seg);
+  showLapCard(i);
+});
+$("lapStrip").addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hideLapCard(); });
+document.addEventListener("pointerdown", (e) => { if (stripHover && !e.target.closest("#stripCard")) hideLapCard(); });
+$("lapStrip").addEventListener("click", (e) => {
+  const seg = e.target.closest("[data-lap]");
+  if (!seg || view?.mode !== "replay") return;
+  const l = player?.laps?.find((x) => x.lap === Number(seg.dataset.lap));
+  if (l) player.seek(l.ms - 3000);
+});
 
 function renderRows(v) {
   if (!v.rows.length) return;
