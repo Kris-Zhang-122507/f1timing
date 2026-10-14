@@ -117,7 +117,8 @@ export class Dashboard {
   add(id) {
     const p = this.panels.find((x) => x.id === id);
     if (!p || p.item) return;
-    this.attach(p, { w: id === "timing" ? 13 : 8, h: id === "timing" ? 30 : 16 });
+    const size = { timing: [13, 30], compare: [12, 30], strategy: [12, 26], driver: [10, 26], rewind: [12, 26] }[id] ?? [8, 16];
+    this.attach(p, { w: size[0], h: size[1] });
     this.changed();
     p.item.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }

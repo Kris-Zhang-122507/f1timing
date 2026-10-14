@@ -674,3 +674,12 @@ button.who-tag:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .catch-zone { fill: rgba(110, 231, 168, .10); }
 .catch-mark { stroke: #6EE7A8; stroke-dasharray: 4 4; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .catch-axis { display: flex; justify-content: space-between; margin-top: 3px; }
+
+/* compare as a dashboard panel: pickers on one compact line */
+#w-compare .cmp-pick { gap: 6px; flex-wrap: nowrap; }
+#w-compare .cmp-sel { font-size: 0; letter-spacing: 0; padding-left: 6px; border-left-width: 3px; flex: 1 1 0; min-width: 0; }
+#w-compare .cmp-sel select { min-height: 30px; min-width: 0; width: 100%; font-size: 13px; border-radius: 6px; padding: 0 6px; }
+#w-compare .vs { font-size: 14px; }
+#w-compare .cmp-now { display: none; }
+#w-compare .card { padding: 8px 4px; border: 0; background: none; }
+#w-compare .catch-gap .big { font-size: 18px; }

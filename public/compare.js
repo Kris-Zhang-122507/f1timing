@@ -1,6 +1,6 @@
 // Compare: two drivers head to head.
-import { lapSeconds } from "./lib/race.js?v=mv772d34";
-import { fade } from "./tyres.js?v=mv772d34";
+import { lapSeconds } from "./lib/race.js?v=mv7jxokn";
+import { fade } from "./tyres.js?v=mv7jxokn";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace("+", "")); return Number.isFinite(n) ? n : null; };
@@ -79,7 +79,7 @@ function catchUp(v, A, B) {
   if (diffs.length >= 2) { let w = 0, sum = 0; diffs.forEach((p, i) => { const k = i + 1; w += k; sum += k * p.d; }); delta = sum / w; }
   else { const pl = recentPace(L), pc = recentPace(C); if (pl && pc) delta = pl - pc; }
   const fL = fade(L.hist), fC = fade(C.hist);
-  const dd = fL != null && fC != null ? Math.max(-0.15, Math.min(0.15, fL - fC)) : 0; // extra gain per lap as tyres age
+  const dd = fL != null && fC != null ? Math.max(-0.08, Math.min(0.08, fL - fC)) : 0; // extra gain per lap as tyres age
   const who = (r) => `<b style="color:${esc(r.colour)}">${esc(r.tla)}</b>`;
   const tyreNote = `${esc(C.tla)} on ${esc(C.tyre)} (${C.tyreAge || "?"} laps) · ${esc(L.tla)} on ${esc(L.tyre)} (${L.tyreAge || "?"} laps)`;
   const stopNote = L.stops !== C.stops ? `${esc((L.stops < C.stops ? L : C).tla)} has made ${Math.abs(L.stops - C.stops)} stop${Math.abs(L.stops - C.stops) > 1 ? "s" : ""} fewer — if they still have to pit, this changes completely.` : "";
@@ -89,18 +89,19 @@ function catchUp(v, A, B) {
   const proj = [gap];
   let g = gap, tDrs = gap <= 1 ? 0 : null, tOn = gap <= 0.4 ? 0 : null;
   for (let t = 1; t <= left; t++) {
-    g = Math.max(0, g - (delta + dd * t));
+    g = Math.max(0, g - (delta + dd * Math.min(t, 6))); // tyre wear difference builds for a few laps, then levels off
     proj.push(g);
     if (tDrs == null && g <= 1) tDrs = t;
     if (tOn == null && g <= 0.4) tOn = t;
   }
   const gaining = delta + dd * Math.min(5, left) > 0.02;
+  const atFlag = proj[proj.length - 1];
   const rate = Math.abs(delta);
   let verdict, cls;
   if (!left) { verdict = "Last lap — whatever the gap is now is what they finish with."; cls = ""; }
   else if (gap <= 1 && gaining) { verdict = `Already within a second and ${who(C)} is ${rate.toFixed(2)}s a lap quicker — ${tOn ? `right on the gearbox in about ${tOn} lap${tOn > 1 ? "s" : ""}` : "close enough to attack now"}.`; cls = "on"; }
   else if (gap <= 1) { verdict = `Within a second, but ${who(L)} is ${rate.toFixed(2)}s a lap quicker and pulling away.`; cls = "off"; }
-  else if (!gaining) { verdict = `Not catching — ${who(L)} is ${rate.toFixed(2)}s a lap quicker. Gap at the flag ≈ <b>${(gap + rate * left).toFixed(1)}s</b>.`; cls = "off"; }
+  else if (!gaining) { verdict = `Not catching — ${who(L)} is ${rate.toFixed(2)}s a lap quicker. Gap at the flag ≈ <b>${atFlag.toFixed(1)}s</b>.`; cls = "off"; }
   else if (tDrs != null) {
     verdict = `${who(C)} gets within 1 second in about <b>${tDrs} lap${tDrs > 1 ? "s" : ""}</b> (lap ${v.lap + tDrs})${tOn != null && tOn !== tDrs ? `, right behind by lap ${v.lap + tOn}` : ""} — ${left - tDrs} lap${left - tDrs === 1 ? "" : "s"} left to make the move.`;
     cls = left - tDrs >= 3 ? "on" : "maybe";

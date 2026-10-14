@@ -1,6 +1,6 @@
 // Qualifying: who gets through? For each driver: their best, the gap to the cut-off, and — if
 // they're on a lap right now — where that lap is heading (sectors done + their best for the rest).
-import { lapSeconds } from "./lib/race.js?v=mv772d34";
+import { lapSeconds } from "./lib/race.js?v=mv7jxokn";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const secs = (x) => { const v = lapSeconds(x) ?? parseFloat(x); return Number.isFinite(v) && v > 0 ? v : null; };
