@@ -18,7 +18,13 @@ h2 { margin: 0; font: 600 20px/1.2 "Barlow Condensed", sans-serif; letter-spacin
 
 /* header */
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.brand { font: 700 28px "Barlow Condensed", sans-serif; letter-spacing: 0.04em; color: var(--accent); }
+.brand { font: 700 28px "Barlow Condensed", sans-serif; letter-spacing: 0.04em; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.live-badge { display: inline-flex; align-items: center; gap: 5px; font: 700 11px "Barlow", sans-serif; letter-spacing: .14em; padding: 3px 7px 3px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--faint); }
+.live-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.live-badge.on { color: #FF6B6B; border-color: rgba(255, 77, 77, .45); background: rgba(255, 77, 77, .08); }
+.live-badge.on i { background: #FF4D4D; box-shadow: 0 0 0 0 rgba(255, 77, 77, .6); animation: livePulse 1.6s ease-out infinite; }
+@keyframes livePulse { 70% { box-shadow: 0 0 0 7px rgba(255, 77, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); } }
+@media (prefers-reduced-motion: reduce) { .live-badge.on i { animation: none; } }
 .session-name { font: 600 20px "Barlow Condensed", sans-serif; }
 .lap { font: 700 28px "Barlow Condensed", sans-serif; }
 .lap span { color: var(--faint); font-weight: 500; }

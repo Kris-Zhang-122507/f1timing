@@ -1,4 +1,4 @@
-# Undercut (working title)
+# RaceLimit Live
 
 F1 live timing that *explains* the race. Unofficial fan project — not associated with Formula 1.
 
@@ -17,7 +17,7 @@ Stop it with Ctrl+C.
 
 ## Use it on GitHub Pages (no install)
 
-The site also works as plain files on GitHub Pages: **https://kris-zhang-122507.github.io/f1timing/**
+The site also works as plain files on GitHub Pages: **https://kris-zhang-122507.github.io/racelimit-live/**
 
 - It tries to connect to F1 straight from your browser. If F1 blocks that, the status says so.
 - **Load recording** (top right) replays any recording file right in the page, at 1×–60× speed.

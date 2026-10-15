@@ -1,11 +1,11 @@
 # Radio helper (team radio transcripts)
 
-F1's server doesn't let websites read its radio clips, so Undercut can play them but can't turn
+F1's server doesn't let websites read its radio clips, so RaceLimit Live can play them but can't turn
 them into text by itself. The radio helper is a tiny program on Cloudflare's free plan that
 fetches each clip and transcribes it with Whisper (OpenAI's speech model, run by Cloudflare).
 
 - **Free:** Cloudflare's free plan includes about 200 minutes of transcription a day — a whole race weekend of radio is a small fraction of that.
-- **Locked down:** it only works with F1 team radio clips, and only answers your Undercut site.
+- **Locked down:** it only works with F1 team radio clips, and only answers your RaceLimit Live site.
 - **Once:** set it up once; your browser remembers its address.
 
 ## Set it up (about 5 minutes, no card needed)
@@ -20,7 +20,7 @@ fetches each clip and transcribes it with Whisper (OpenAI's speech model, run by
    **`AI`** and save. *(This is what lets it transcribe.)*
 5. Copy the worker's address from its overview page — it looks like
    `https://radio-helper.YOURNAME.workers.dev`.
-6. On Undercut: **Team radio → tick Transcribe → paste the address → Save.**
+6. On RaceLimit Live: **Team radio → tick Transcribe → paste the address → Save.**
 
 New clips are then written out as text, each line marked **DRIVER** or **TEAM** (a best guess:
 the driver's mic has engine noise behind it, the pit wall doesn't).

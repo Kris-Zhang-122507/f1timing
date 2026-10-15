@@ -1,11 +1,11 @@
-// Undercut radio helper — a free Cloudflare Worker that lets the site transcribe team radio.
+// RaceLimit Live radio helper — a free Cloudflare Worker that lets the site transcribe team radio.
 //   GET /transcribe?url=<clip>  → { text, segments: [{ start, end, text, words? }] }  (Whisper, on Cloudflare)
 //   GET /?url=<clip>            → the clip's audio (used to tell the driver's voice from the team's)
 // F1's server doesn't let websites read its radio files, so the site asks this helper instead.
-// It only works with F1 team radio .mp3 files, and only answers your Undercut site.
+// It only works with F1 team radio .mp3 files, and only answers your RaceLimit Live site.
 //
 // Set up: see tools/RADIO-HELPER.md (needs a Workers AI binding called AI)
-const SITE = "https://kris-zhang-122507.github.io/f1timing/public/"; // your Undercut site's address
+const SITE = "https://kris-zhang-122507.github.io/racelimit-live/"; // your RaceLimit Live site's address
 const ORIGIN = new URL(SITE).origin; // browsers only send the start of it (https://name.github.io)
 const CLIP = /^https:\/\/livetiming\.formula1\.com\/static\/[\w\-./%]+\/TeamRadio\/[\w\-.%]+\.mp3$/;
 const TURBO = "@cf/openai/whisper-large-v3-turbo";

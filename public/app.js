@@ -1,24 +1,24 @@
-// Undercut page: draws the race view, from the Undercut server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mv7jxokn";
-import { Race, lapSeconds } from "./lib/race.js?v=mv7jxokn";
-import { CircleView } from "./circle.js?v=mv7jxokn";
-import { renderTyres } from "./tyres.js?v=mv7jxokn";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mv7jxokn";
-import { renderCompare } from "./compare.js?v=mv7jxokn";
-import { renderRewind } from "./rewind.js?v=mv7jxokn";
-import { renderDriver } from "./driver.js?v=mv7jxokn";
-import { Player, parseRecording } from "./player.js?v=mv7jxokn";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv7jxokn";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv7jxokn";
-import { Dashboard } from "./dash.js?v=mv7jxokn";
-import { CarTelemetry } from "./telemetry.js?v=mv7jxokn";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv7jxokn";
-import * as tx from "./transcribe.js?v=mv7jxokn";
-import { renderKnockout } from "./quali.js?v=mv7jxokn";
-import { loadSeason, renderH2H } from "./h2h.js?v=mv7jxokn";
-import { loadStandings, renderStandings } from "./standings.js?v=mv7jxokn";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv7jxokn";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv7jxokn";
+// RaceLimit Live page: draws the race view, from the RaceLimit server or worked out right here.
+import { LiveState } from "./lib/state.js?v=mv93r5jg";
+import { Race, lapSeconds } from "./lib/race.js?v=mv93r5jg";
+import { CircleView } from "./circle.js?v=mv93r5jg";
+import { renderTyres } from "./tyres.js?v=mv93r5jg";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mv93r5jg";
+import { renderCompare } from "./compare.js?v=mv93r5jg";
+import { renderRewind } from "./rewind.js?v=mv93r5jg";
+import { renderDriver } from "./driver.js?v=mv93r5jg";
+import { Player, parseRecording } from "./player.js?v=mv93r5jg";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mv93r5jg";
+import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mv93r5jg";
+import { Dashboard } from "./dash.js?v=mv93r5jg";
+import { CarTelemetry } from "./telemetry.js?v=mv93r5jg";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mv93r5jg";
+import * as tx from "./transcribe.js?v=mv93r5jg";
+import { renderKnockout } from "./quali.js?v=mv93r5jg";
+import { loadSeason, renderH2H } from "./h2h.js?v=mv93r5jg";
+import { loadStandings, renderStandings } from "./standings.js?v=mv93r5jg";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mv93r5jg";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mv93r5jg";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -72,7 +72,7 @@ function segClass(s) {
 }
 
 // ---------- data sources ----------
-// 1. Undercut server (npm start): the server does the work and sends us a ready-made view.
+// 1. RaceLimit server (npm start): the server does the work and sends us a ready-made view.
 // 2. Standalone (GitHub Pages, or ?direct): this page connects to F1 itself and does the work here.
 // 3. A recording file loaded with the "Load recording" button, replayed in this page.
 const params = new URLSearchParams(location.search);
@@ -93,7 +93,7 @@ function connect() {
   serverSocket.onclose = () => {
     if (!useServer) return;
     $("conn").className = "conn";
-    $("connText").textContent = "Disconnected from the Undercut server — retrying…";
+    $("connText").textContent = "Disconnected from the RaceLimit server — retrying…";
     setTimeout(connect, 2000);
   };
 }
@@ -147,7 +147,7 @@ function connectDirect() {
     clearInterval(ping);
     if (ws !== directSocket) return;
     if (!gotData) {
-      engine.status = `Your browser couldn't connect to F1 directly (code ${e.code}). Live needs the Undercut server — you can still load a recording.`;
+      engine.status = `Your browser couldn't connect to F1 directly (code ${e.code}). Live needs the RaceLimit server — you can still load a recording.`;
     } else {
       engine.status = "Connection lost — reconnecting…";
       setTimeout(connectDirect, 3000);
@@ -165,7 +165,7 @@ function liveView() {
   const lapNow = Math.max(0, ...Object.keys(arrivals.laps).map(Number), Number(engine?.state?.data?.LapCount?.CurrentLap) || 0, ...delayedMsgs.filter((m) => m.topic === "LapCount").map((m) => Number(m.data?.CurrentLap) || 0));
   return lapNow ? { lap: lapNow, refLap: view?.refLap } : null;
 }
-const delayedViews = [];  // ready-made views from the Undercut server, waiting
+const delayedViews = [];  // ready-made views from the RaceLimit server, waiting
 const arrivals = { start: null, lap: null, laps: {} }; // when lights out / each lap change reached us (undelayed)
 function noteArrival(topicOrView, data) {
   if (typeof topicOrView === "string") {
@@ -494,9 +494,13 @@ function render() {
   const w = v.weather;
   $("weather").textContent = w.air ? `Air ${w.air}° · Track ${w.track}° · ${w.rain ? "RAIN" : "Dry"}` : "";
   $("conn").className = `conn ${v.mode === "replay" ? "replay" : v.status.startsWith("Live") ? "live" : ""}`;
+  // the LIVE badge next to the logo: red and glowing only while a session is live
+  const onAir = v.mode !== "replay" && v.status.startsWith("Live") && !["Finalised", "Ends", "Inactive"].includes(v.session?.status);
+  $("liveBadge").classList.toggle("on", onAir);
+  $("liveBadge").title = onAir ? `Live: ${v.session.meeting} ${v.session.name}`.trim() : v.mode === "replay" ? "Watching a replay" : "Not live right now";
   $("connText").textContent = v.mode === "replay" && v.replayTime ? `Replay · ${v.replayTime.slice(11, 19)} UTC` : v.status;
   $("delayMenu").hidden = v.mode === "replay";
-  document.title = v.totalLaps ? `L${v.lap}/${v.totalLaps} · Undercut` : "Undercut — live timing";
+  document.title = v.totalLaps ? `L${v.lap}/${v.totalLaps} · RaceLimit Live` : "RaceLimit Live";
 
   renderStrip(v);
   // only draw the tab you're looking at — hidden tabs cost nothing
@@ -894,7 +898,7 @@ function txCard() {
   if (h && !txEditing) return tx.status.error ? `<div class="tx-card small"><div class="tx-err">${esc(tx.status.error)}</div><button class="linkbtn" id="txEdit">Change helper address</button></div>` : "";
   return `<div class="tx-card small">
       <div>F1's server won't let websites read its radio clips, so transcripts come from your own free <b>radio helper</b> on Cloudflare — it fetches each clip and turns the speech into text. Set it up once, about 5 minutes, no card needed.</div>
-      <a href="https://github.com/Kris-Zhang-122507/f1timing/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener"><b>How to set up the radio helper</b></a>
+      <a href="https://github.com/Kris-Zhang-122507/racelimit-live/blob/main/tools/RADIO-HELPER.md" target="_blank" rel="noopener"><b>How to set up the radio helper</b></a>
       <form class="tx-helper" id="txHelperForm"><label class="sr" for="txHelper">Radio helper address</label>
         <input id="txHelper" placeholder="https://radio-helper.yourname.workers.dev" value="${esc(h)}" autocomplete="off">
         <button class="btn primary" type="submit">Save</button></form></div>`;

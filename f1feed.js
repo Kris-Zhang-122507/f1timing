@@ -13,7 +13,7 @@ export const TOPICS = [
 ];
 
 export async function connectLive({ onSnapshot, onMessage, log = console.log }) {
-  const headers = { "User-Agent": "undercut/0.2" };
+  const headers = { "User-Agent": "racelimit-live/0.2" };
   try {
     // F1's load balancer wants its AWSALBCORS cookie sent back to it.
     const pre = await fetch(`${BASE}/negotiate`, { method: "OPTIONS" });

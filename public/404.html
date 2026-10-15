@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Off track — Undercut</title>
+<title>Off track — RaceLimit Live</title>
 <script>
-  // Old links: the site used to live at /f1timing/public/ — send those straight to the same page at the new address.
+  // Old links into the public/ folder — send those straight to the same page without it.
   (function () {
-    var base = "/f1timing/", p = location.pathname;
+    var base = "/racelimit-live/", p = location.pathname;
     if (p.indexOf(base + "public/") === 0 || p === base + "public") {
       location.replace(base + p.slice((base + "public/").length) + location.search + location.hash);
     }
@@ -22,6 +22,7 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Barlow", system-ui, sans-serif; display: grid; place-items: center; padding: 24px 16px; }
   main { width: min(640px, 100%); display: flex; flex-direction: column; gap: 22px; }
   .brand { font: 700 18px "Barlow Condensed", sans-serif; letter-spacing: .18em; color: var(--accent); }
+  .brand span { color: var(--red); font-size: 13px; letter-spacing: .14em; }
   h1 { margin: 0; font: 700 clamp(64px, 18vw, 120px)/0.9 "JetBrains Mono", monospace; letter-spacing: -.04em; }
   h1 span { color: var(--red); }
   .lead { margin: 0; font: 600 clamp(22px, 5vw, 28px)/1.2 "Barlow Condensed", sans-serif; letter-spacing: .02em; }
@@ -51,7 +52,7 @@
 </head>
 <body>
 <main>
-  <div class="brand">UNDERCUT</div>
+  <div class="brand">RACELIMIT <span>LIVE</span></div>
   <div class="strip" id="strip" aria-hidden="true"></div>
   <div>
     <h1>4<span>0</span>4</h1>
@@ -61,9 +62,9 @@
     <div class="rc-top"><b>Race control</b><span id="rcTime"></span></div>
     <div class="rc-msg">PAGE <span id="rcPath"></span> TIME DELETED — TRACK LIMITS AT TURN 404. NO FURTHER ACTION.</div>
   </div>
-  <p class="muted">The address doesn't lead anywhere on Undercut. It may be an old link, or a typo.</p>
+  <p class="muted">The address doesn't lead anywhere on RaceLimit Live. It may be an old link, or a typo.</p>
   <div class="actions">
-    <a class="btn primary" href="/f1timing/">Back to the pit lane →</a>
+    <a class="btn primary" href="/racelimit-live/">Back to the pit lane →</a>
   </div>
   <footer>Unofficial fan project. Not associated with Formula 1.</footer>
 </main>
@@ -73,7 +74,7 @@
   strip.innerHTML = html;
   var now = new Date();
   document.getElementById("rcTime").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  var path = decodeURIComponent(location.pathname.replace(/^\/f1timing/, "")) || "/";
+  var path = decodeURIComponent(location.pathname.replace(/^\/racelimit-live/, "")) || "/";
   document.getElementById("rcPath").textContent = (path.length > 40 ? path.slice(0, 39) + "…" : path).toUpperCase();
 </script>
 </body>

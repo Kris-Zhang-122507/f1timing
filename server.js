@@ -1,4 +1,4 @@
-// undercut server: F1 live feed (or a recording) -> browser over WebSocket.
+// RaceLimit Live server: F1 live feed (or a recording) -> browser over WebSocket.
 //
 //   npm start                                         live, also records to recordings/
 //   npm run replay -- recordings/xyz.jsonl --speed 10 replay a recording
@@ -65,7 +65,7 @@ setInterval(() => {
   for (const c of wss.clients) if (c.readyState === 1) c.send(p);
 }, 500);
 
-server.listen(PORT, () => console.log(`Undercut running → http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`RaceLimit Live running → http://localhost:${PORT}`));
 
 // ---------- data source ----------
 if (replayFile) {

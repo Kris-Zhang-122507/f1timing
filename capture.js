@@ -1,4 +1,4 @@
-// undercut — step 1: connect to F1's live timing feed, record it, and show a terminal board.
+// RaceLimit Live — step 1: connect to F1's live timing feed, record it, and show a terminal board.
 //
 //   npm install
 //   npm run live                         -> connect live, record to recordings/<time>.jsonl
@@ -81,7 +81,7 @@ async function live() {
   const record = (obj) => rec.write(JSON.stringify({ t: new Date().toISOString(), ...obj }) + "\n");
 
   // F1's load balancer wants its AWSALBCORS cookie sent back to it.
-  const headers = { "User-Agent": "undercut/0.1" };
+  const headers = { "User-Agent": "racelimit-live/0.1" };
   try {
     const pre = await fetch(`${BASE}/negotiate`, { method: "OPTIONS" });
     const cookie = pre.headers.get("set-cookie")?.match(/AWSALBCORS=[^;]+/)?.[0];

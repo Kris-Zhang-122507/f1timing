@@ -25,7 +25,7 @@ const decode = (s) => String(s ?? "")
 const tag = (s, name) => s.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"))?.[1] ?? "";
 
 async function feed(source, url) {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (undercut fan project; headlines only)" } });
+  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (RaceLimit Live fan project; headlines only)" } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const xml = await r.text();
   return [...xml.matchAll(/<item[\s>][\s\S]*?<\/item>/gi)].map((m) => {

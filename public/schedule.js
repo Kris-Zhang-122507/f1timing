@@ -95,5 +95,5 @@ export function calendarFile(races, { racesOnly = false, now = Date.now() } = {}
       "END:VEVENT",
     ].join("\r\n"));
   }
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Undercut//F1 schedule//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:F1 sessions", ...events, "END:VCALENDAR"].join("\r\n") + "\r\n";
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//RaceLimit Live//F1 schedule//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:F1 sessions", ...events, "END:VCALENDAR"].join("\r\n") + "\r\n";
 }
