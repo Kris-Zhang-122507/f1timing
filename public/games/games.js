@@ -1,10 +1,10 @@
 // RaceLimit Games: a small menu plus three games, one at a time, chosen by the address (#lights,
 // #track, #pit) so each game has its own link you can share.
-import { mountLights } from "./lights.js?v=mvc4lmfh";
-import { mountTrack } from "./track-guess.js?v=mvc4lmfh";
-import { mountPit } from "./pitstop.js?v=mvc4lmfh";
-import { load } from "./common.js?v=mvc4lmfh";
-import { soundButton } from "./sfx.js?v=mvc4lmfh";
+import { mountLights } from "./lights.js?v=mvc4w8sc";
+import { mountTrack } from "./track-guess.js?v=mvc4w8sc";
+import { mountPit } from "./pitstop.js?v=mvc4w8sc";
+import { load } from "./common.js?v=mvc4w8sc";
+import { soundButton } from "./sfx.js?v=mvc4w8sc";
 
 const GAMES = {
   lights: { title: "Lights Out", mount: mountLights },
