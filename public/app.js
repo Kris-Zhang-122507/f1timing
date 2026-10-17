@@ -1,24 +1,24 @@
 // RaceLimit Live page: draws the race view, from the RaceLimit server or worked out right here.
-import { LiveState } from "./lib/state.js?v=mvbx25sl";
-import { Race, lapSeconds } from "./lib/race.js?v=mvbx25sl";
-import { CircleView } from "./circle.js?v=mvbx25sl";
-import { renderTyres } from "./tyres.js?v=mvbx25sl";
-import { renderStrategy, renderPitTable } from "./strategy.js?v=mvbx25sl";
-import { renderCompare } from "./compare.js?v=mvbx25sl";
-import { renderRewind } from "./rewind.js?v=mvbx25sl";
-import { renderDriver } from "./driver.js?v=mvbx25sl";
-import { Player, parseRecording } from "./player.js?v=mvbx25sl";
-import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mvbx25sl";
-import { TrackView, loadTrack, loadGps, circuitSlug } from "./track.js?v=mvbx25sl";
-import { Dashboard } from "./dash.js?v=mvbx25sl";
-import { CarTelemetry } from "./telemetry.js?v=mvbx25sl";
-import { renderStewards, renderPitWindow } from "./racecalls.js?v=mvbx25sl";
-import * as tx from "./transcribe.js?v=mvbx25sl";
-import { renderKnockout } from "./quali.js?v=mvbx25sl";
-import { loadSeason, renderH2H } from "./h2h.js?v=mvbx25sl";
-import { loadStandings, renderStandings } from "./standings.js?v=mvbx25sl";
-import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mvbx25sl";
-import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mvbx25sl";
+import { LiveState } from "./lib/state.js?v=mvc4lmfh";
+import { Race, lapSeconds } from "./lib/race.js?v=mvc4lmfh";
+import { CircleView } from "./circle.js?v=mvc4lmfh";
+import { renderTyres } from "./tyres.js?v=mvc4lmfh";
+import { renderStrategy, renderPitTable } from "./strategy.js?v=mvc4lmfh";
+import { renderCompare } from "./compare.js?v=mvc4lmfh";
+import { renderRewind } from "./rewind.js?v=mvc4lmfh";
+import { renderDriver } from "./driver.js?v=mvc4lmfh";
+import { Player, parseRecording } from "./player.js?v=mvc4lmfh";
+import { loadSchedule, currentWeekend, renderSchedule, calendarFile } from "./schedule.js?v=mvc4lmfh";
+import { TrackView, loadTrack, loadTrackInfo, loadGps, circuitSlug } from "./track.js?v=mvc4lmfh";
+import { Dashboard } from "./dash.js?v=mvc4lmfh";
+import { CarTelemetry } from "./telemetry.js?v=mvc4lmfh";
+import { renderStewards, renderPitWindow } from "./racecalls.js?v=mvc4lmfh";
+import * as tx from "./transcribe.js?v=mvc4lmfh";
+import { renderKnockout } from "./quali.js?v=mvc4lmfh";
+import { loadSeason, renderH2H } from "./h2h.js?v=mvc4lmfh";
+import { loadStandings, renderStandings } from "./standings.js?v=mvc4lmfh";
+import { loadNews, loadIncidentIndex, loadIncidents, renderNews, renderTechnical } from "./news.js?v=mvc4lmfh";
+import { loadTechnical, loadCrashCost, renderUpgrades, renderPowerUnits, renderCrashCost } from "./technical.js?v=mvc4lmfh";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -594,7 +594,12 @@ function updateCircle(v) {
     const gpsKey = v.mode === "replay" && archive?.sessions?.some((s) => s.key === replayKey && s.gps) ? replayKey : null;
     if (gpsKey) loadGps(gpsKey).then((g) => trackView.setGps(g, circleNow));
     else trackView.setGps(null);
-    loadTrack(v.session.circuit).then((pts) => trackView.setPoints(pts));
+    loadTrackInfo(v.session.circuit).then((info) => { trackView.setPoints(info?.points ?? null); trackView.setInfo(info); });
+    trackView.setFlags(v.flags);
+    // the header says what's out, in words
+    const fs = Object.entries(v.flags?.sectors ?? {}), dbl = fs.filter(([, k]) => k === "double").map(([n]) => n), yel = fs.filter(([, k]) => k !== "double").map(([n]) => n);
+    const whole = { 4: "Safety car", 6: "Virtual safety car", 7: "VSC ending", 5: "Red flag" }[v.flags?.track];
+    $("trackNote").innerHTML = [whole && `<span class="tn-${v.flags.track === "5" ? "red" : "sc"}">${whole}</span>`, dbl.length && `<span class="tn-dbl">Double yellow: sector ${dbl.join(", ")}</span>`, yel.length && `<span class="tn-y">Yellow: sector ${yel.join(", ")}</span>`].filter(Boolean).join(" · ");
   }
   const sel = v.rows.find((r) => r.n === circleSel);
   $("circleSel").textContent = sel ? `Reference: ${sel.tla} — gaps are relative to them` : "Tap a car to make it the reference";

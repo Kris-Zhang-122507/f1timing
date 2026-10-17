@@ -693,3 +693,23 @@ button.who-tag:focus-visible { outline: 2px solid var(--accent); outline-offset:
 #w-compare .cmp-now { display: none; }
 #w-compare .card { padding: 8px 4px; border: 0; background: none; }
 #w-compare .catch-gap .big { font-size: 18px; }
+
+/* track map: corner numbers and flags */
+.corner-tick { stroke: #3A4050; stroke-width: 2; }
+.corner-dot { fill: #12151C; stroke: #3A4050; stroke-width: 2; }
+.corner-num { font: 700 19px "Barlow Condensed", sans-serif; fill: #9AA3B2; text-anchor: middle; dominant-baseline: central; letter-spacing: .02em; }
+.flag-sector { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 26; }
+.flag-sector.yellow { stroke: #F5D623; opacity: .85; animation: flagPulse 1.2s ease-in-out infinite; }
+.flag-sector.double { stroke: #FFB020; stroke-width: 32; opacity: .95; animation: flagPulse .7s ease-in-out infinite; }
+.flag-track { fill: none; stroke-width: 26; stroke-linejoin: round; opacity: .55; }
+.flag-track.sc { stroke: #F2A93B; stroke-dasharray: 40 22; animation: flagPulse 1.6s ease-in-out infinite; }
+.flag-track.vsc { stroke: #F2A93B; stroke-dasharray: 14 18; animation: flagPulse 1.6s ease-in-out infinite; }
+.flag-track.red { stroke: #FF4D4D; opacity: .7; }
+.flag-tag rect { fill: #1A1405; stroke: #F5D623; stroke-width: 2; }
+.flag-tag.double rect { stroke: #FFB020; fill: #261A04; }
+.flag-tag text { font: 700 16px "Barlow Condensed", sans-serif; fill: #F5D623; text-anchor: middle; dominant-baseline: central; letter-spacing: .04em; }
+.flag-tag.double text { fill: #FFB020; }
+@keyframes flagPulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .flag-sector, .flag-track { animation: none; } }
+#trackNote .tn-y { color: #F5D623; font-weight: 600; } #trackNote .tn-dbl { color: #FFB020; font-weight: 600; }
+#trackNote .tn-sc { color: #F2A93B; font-weight: 600; } #trackNote .tn-red { color: #FF6B6B; font-weight: 600; }

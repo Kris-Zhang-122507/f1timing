@@ -11,16 +11,14 @@ const el = (tag, attrs = {}, parent) => {
 export const circuitSlug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 const cache = {};
-export async function loadTrack(circuit) {
+// the circuit file: { points, corners?: [{ n, l, p: [x, y] }], marshal?: [{ n, p }] }
+export async function loadTrackInfo(circuit) {
   const slug = circuitSlug(circuit);
   if (!slug) return null;
-  if (slug in cache) return cache[slug];
-  try {
-    const r = await fetch(`data/tracks/${slug}.json`);
-    cache[slug] = r.ok ? (await r.json()).points : null;
-  } catch { cache[slug] = null; }
+  if (!(slug in cache)) cache[slug] = fetch(`data/tracks/${slug}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   return cache[slug];
 }
+export async function loadTrack(circuit) { return (await loadTrackInfo(circuit))?.points ?? null; }
 
 // Real car positions for an archived race (data/positions/<key>.json), if the archive has them.
 const gpsCache = {};
@@ -56,6 +54,7 @@ export class TrackView {
     if (points === this.points) return;
     this.usingGps = fromGps;
     this.points = points;
+    this.bbox = null;
     this.items.clear();
     this.box.innerHTML = "";
     if (!points) { this.box.innerHTML = `<div class="muted empty">The track map appears once a session at this circuit has been archived (about an hour after it ends).</div>`; return; }
@@ -74,10 +73,90 @@ export class TrackView {
     el("rect", { x: sx - 10, y: sy - 10, width: 20, height: 20, fill: "#E8EAF0", rx: 3 }, svg);
     el("text", { x: sx, y: sy - 18, class: "c-sub" }, svg).textContent = "start / finish";
     if (fromGps) el("text", { x: pad, y: h - 20, class: "c-sub", "text-anchor": "start" }, svg).textContent = "real car positions (GPS, once a second)";
+    this.flagLayer = el("g", { class: "flag-layer" }, svg);
+    this.cornerLayer = el("g", { class: "corner-layer" }, svg);
+    this.flagKey = "";
+    this.svg = svg;
+    this.drawCorners();
+    this.drawFlags();
     this.battleLayer = el("g", {}, svg);
     this.dotLayer = el("g", {}, svg);
     this.svg = svg;
     this.box.appendChild(svg);
+  }
+
+  // corner numbers and marshal sectors, from the circuit file
+  setInfo(info) {
+    if (info === this.info) return;
+    this.info = info;
+    this.drawCorners();
+    this.flagKey = "";
+    this.drawFlags();
+  }
+
+  // a point given in the circuit file's 0–1000 box, placed on whichever outline is showing
+  place(p) {
+    const b = this.bbox ??= (() => { const xs = this.points.map((q) => q[0]), ys = this.points.map((q) => q[1]); const minX = Math.min(...xs), minY = Math.min(...ys); return { minX, minY, size: Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY) }; })();
+    return [b.minX + (p[0] / 1000) * b.size, b.minY + (p[1] / 1000) * b.size];
+  }
+  nearest(xy) {
+    let best = 0, bd = Infinity;
+    this.points.forEach((q, i) => { const d = (q[0] - xy[0]) ** 2 + (q[1] - xy[1]) ** 2; if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+
+  drawCorners() {
+    if (!this.cornerLayer) return;
+    this.cornerLayer.innerHTML = "";
+    const corners = this.info?.corners;
+    if (!corners?.length || !this.points) return;
+    const n = this.points.length, pts = this.points, off = this.off;
+    const cx = pts.reduce((a, q) => a + q[0], 0) / n, cy = pts.reduce((a, q) => a + q[1], 0) / n;
+    for (const c of corners) {
+      const xy = this.place(c.p), i = this.nearest(xy);
+      // push the label to the outside of the bend (away from where the track curves to)
+      const a = pts[(i - 6 + n) % n], b = pts[(i + 6) % n], p = pts[i];
+      let ox = p[0] - (a[0] + b[0]) / 2, oy = p[1] - (a[1] + b[1]) / 2, len = Math.hypot(ox, oy);
+      if (len < 4) { ox = p[0] - cx; oy = p[1] - cy; len = Math.hypot(ox, oy) || 1; }
+      const lx = xy[0] + (ox / len) * 40 + off, ly = xy[1] + (oy / len) * 40 + off;
+      const g = el("g", { class: "corner" }, this.cornerLayer);
+      el("line", { x1: xy[0] + off, y1: xy[1] + off, x2: lx, y2: ly, class: "corner-tick" }, g);
+      el("circle", { cx: lx, cy: ly, r: 17, class: "corner-dot" }, g);
+      el("text", { x: lx, y: ly, class: "corner-num" }, g).textContent = `${c.n}${c.l}`;
+    }
+  }
+
+  // flags: { sectors: { 7: "yellow" | "double" }, track: "4" } — lights up the stretch of track
+  setFlags(flags) {
+    this.flags = flags;
+    this.drawFlags();
+  }
+  drawFlags() {
+    if (!this.flagLayer || !this.points) return;
+    const f = this.flags ?? {}, ms = this.info?.marshal ?? [];
+    const key = JSON.stringify([f.sectors, f.track, ms.length]);
+    if (key === this.flagKey) return;
+    this.flagKey = key;
+    this.flagLayer.innerHTML = "";
+    const pts = this.points, n = pts.length, off = this.off;
+    const path = (i0, i1) => { const out = []; for (let k = i0; ; k = (k + 1) % n) { out.push(pts[k]); if (k === i1 || out.length > n) break; } return "M" + out.map((q) => `${q[0] + off} ${q[1] + off}`).join(" L"); };
+    // whole track: safety car / VSC / red flag
+    const whole = { 4: ["sc", "SAFETY CAR"], 6: ["vsc", "VIRTUAL SAFETY CAR"], 7: ["vsc", "VSC ENDING"], 5: ["red", "RED FLAG"] }[f.track];
+    if (whole) el("path", { d: path(0, n - 1) + " Z", class: `flag-track ${whole[0]}` }, this.flagLayer);
+    // one marshal sector = from its post to the next one
+    const sorted = [...ms].sort((a, b) => a.n - b.n);
+    for (const [num, kind] of Object.entries(f.sectors ?? {})) {
+      const k = sorted.findIndex((m) => m.n === Number(num));
+      if (k < 0) continue;
+      const i0 = this.nearest(this.place(sorted[k].p)), i1 = this.nearest(this.place(sorted[(k + 1) % sorted.length].p));
+      el("path", { d: path(i0, i1), class: `flag-sector ${kind}` }, this.flagLayer);
+      const mid = pts[(i0 + Math.round(((i1 - i0 + n) % n) / 2)) % n];
+      const g = el("g", { class: `flag-tag ${kind}` }, this.flagLayer);
+      const label = `${kind === "double" ? "YY" : "Y"} ${num}`, wdt = 18 + label.length * 10;
+      el("rect", { x: mid[0] + off - wdt / 2, y: mid[1] + off - 46, width: wdt, height: 24, rx: 5 }, g);
+      el("text", { x: mid[0] + off, y: mid[1] + off - 34 }, g).textContent = label;
+      el("title", {}, g).textContent = `${kind === "double" ? "Double yellow" : "Yellow"} flag in marshal sector ${num}`;
+    }
   }
 
   at(f) {

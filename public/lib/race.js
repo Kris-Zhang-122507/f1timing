@@ -1,4 +1,4 @@
-import { stewards, driverStewarding } from "./stewards.js?v=mvbx25sl";
+import { stewards, driverStewarding } from "./stewards.js?v=mvc4lmfh";
 // Turns raw timing state into what the page shows: a tidy driver list, battles,
 // a "what just happened" story and race control messages with plain-English notes.
 
@@ -196,6 +196,7 @@ export class Race {
         else if (info && track === "2") this.lapEvents[lap] ??= "yellow";
       }
       if (["4", "6", "7", "5"].includes(track) && lap) this.lapEvents[lap] = "sc";
+      if (track === "1") this.greenAt = this.now(); // yellows shown before this have been cleared
       this.lastTrack = track;
     }
 
@@ -436,6 +437,28 @@ export class Race {
       if (arr.length < 8 && !arr.some((x) => x.text === t)) arr.push({ text: t, flag: flagColour(m), cat: categoryOf(m) });
     }
 
+    // which marshal sectors have a yellow right now ("YELLOW IN TRACK SECTOR 7" … "CLEAR IN TRACK SECTOR 7")
+    const sectors = {}, since = {};
+    for (const m of list(d.RaceControlMessages?.Messages)) {
+      const t = String(m?.Message ?? "").toUpperCase(), flag = String(m?.Flag ?? "").toUpperCase(), scope = String(m?.Scope ?? "");
+      const sec = Number(m?.Sector) || Number(t.match(/TRACK SECTOR (\d+)/)?.[1]) || null;
+      if ((scope === "Sector" || /TRACK SECTOR/.test(t)) && sec) {
+        if (/DOUBLE YELLOW/.test(flag) || /DOUBLE YELLOW/.test(t)) { sectors[sec] = "double"; since[sec] = Date.parse(m.Utc) || 0; }
+        else if (flag === "YELLOW" || /^YELLOW IN TRACK SECTOR/.test(t)) { sectors[sec] = "yellow"; since[sec] = Date.parse(m.Utc) || 0; }
+        else if (/CLEAR|GREEN/.test(flag) || /^CLEAR IN TRACK SECTOR/.test(t)) delete sectors[sec];
+      } else if (/TRACK CLEAR|CHEQUERED/.test(t) || (scope === "Track" && /CLEAR|GREEN|CHEQUERED/.test(flag))) {
+        for (const k of Object.keys(sectors)) delete sectors[k];
+      }
+    }
+    // if the whole track went green after a yellow was shown, it was cleared without a message
+    const trackCode = String(d.TrackStatus?.Status ?? "1");
+    // and replays don't record yellows in the track status, so there a yellow fades after 4 minutes
+    if (trackCode === "1") {
+      const tNow = this.now();
+      for (const k of Object.keys(sectors)) if (since[k] && ((this.greenAt && since[k] < this.greenAt - 1500) || tNow - since[k] > 240000)) delete sectors[k];
+    }
+    const flags = { sectors, track: trackCode };
+
     const clock = d.ExtrapolatedClock ?? {};
     const w = d.WeatherData ?? {};
     const track = String(d.TrackStatus?.Status ?? "1");
@@ -454,6 +477,7 @@ export class Race {
       weather: { air: w.AirTemp ?? "", track: w.TrackTemp ?? "", humidity: w.Humidity ?? "", wind: w.WindSpeed ?? "", rain: w.Rainfall === "1" || w.Rainfall === 1 },
       lapEvents: this.lapHistory(),
       rcLaps,
+      flags,
       rows,
       battles,
       story: this.story.slice(-40).reverse(),

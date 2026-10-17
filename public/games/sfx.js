@@ -1,6 +1,6 @@
 // Sound effects, made on the fly with the Web Audio API (no sound files to download).
 // Off switch in the header, remembered in this browser.
-import { load, save } from "./common.js?v=mvbx25sl";
+import { load, save } from "./common.js?v=mvc4lmfh";
 
 let ctx = null, master = null;
 let muted = load("muted", false);

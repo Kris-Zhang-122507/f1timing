@@ -1,6 +1,6 @@
 // My driver: one driver's race at a glance — built for a phone next to the TV.
-import { computeModel } from "./circle.js?v=mvbx25sl";
-import { fade } from "./tyres.js?v=mvbx25sl";
+import { computeModel } from "./circle.js?v=mvc4lmfh";
+import { fade } from "./tyres.js?v=mvc4lmfh";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace("+", "")); return Number.isFinite(n) ? n : null; };

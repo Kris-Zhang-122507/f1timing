@@ -44,11 +44,14 @@ for (const file of readdirSync(TRACKS).filter((f) => f.endsWith(".json"))) {
   const path = `${TRACKS}/${file}`;
   const t = JSON.parse(readFileSync(path, "utf8"));
   if (t.cv === VERSION && !force) continue;
+  // a circuit that didn't work is tried again after a week, not every hour
+  if (t.cvMiss && Date.now() - Date.parse(t.cvMiss.at) < 7 * 864e5 && !force) continue;
+  const miss = (why) => { console.log(`${t.circuit}: ${why}`); t.cvMiss = { at: new Date().toISOString(), why }; writeFileSync(path, JSON.stringify(t)); };
   const key = keys[t.circuit];
-  if (!key) { console.log(`${t.circuit}: no circuit key`); continue; }
+  if (!key) { miss("no circuit key"); continue; }
   let mv = null;
   for (const y of [YEAR, YEAR - 1, YEAR - 2, YEAR - 3]) { mv = await json(`https://api.multiviewer.app/api/v1/circuits/${key}/${y}`); await sleep(800); if (mv?.x?.length) break; }
-  if (!mv?.x?.length) { console.log(`${t.circuit}: no circuit info`); continue; }
+  if (!mv?.x?.length) { miss(`no circuit info for key ${key}`); continue; }
 
   // MultiViewer's x/y are F1 position coordinates; flip y like the outline and fit a 0–1000 box
   const raw = mv.x.map((x, i) => [x, mv.y[i]]);
@@ -60,11 +63,12 @@ for (const file of readdirSync(TRACKS).filter((f) => f.endsWith(".json"))) {
   const ours = t.points.map(([x, y]) => [((x - ob.minX) / ob.size) * 1000, ((y - ob.minY) / ob.size) * 1000]);
   const theirs = raw.filter((_, i) => i % 4 === 0).map(([x, y]) => norm(x, y));
   const err = theirs.reduce((a, p) => a + Math.min(...ours.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))), 0) / theirs.length;
-  if (err > 25) { console.log(`${t.circuit}: shapes don't line up (off by ${err.toFixed(1)}) — skipped`); continue; }
+  if (err > 25) { miss(`shapes don't line up (off by ${err.toFixed(1)}, key ${key})`); continue; }
 
   t.corners = (mv.corners ?? []).map((c) => ({ n: c.number, l: c.letter || "", p: norm(c.trackPosition.x, c.trackPosition.y) }));
   t.marshal = (mv.marshalSectors ?? []).map((m) => ({ n: m.number, p: norm(m.trackPosition.x, m.trackPosition.y) }));
   t.cv = VERSION;
+  delete t.cvMiss;
   writeFileSync(path, JSON.stringify(t));
   changed++;
   console.log(`${t.circuit}: ${t.corners.length} corners, ${t.marshal.length} marshal sectors (fit ${err.toFixed(1)})`);
