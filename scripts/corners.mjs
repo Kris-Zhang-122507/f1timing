@@ -8,7 +8,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 
 const TRACKS = "public/data/tracks";
-const VERSION = 1;
+const VERSION = 2;
 const YEAR = new Date().getUTCFullYear();
 const UA = { "User-Agent": "racelimit-live fan project (github.com/Kris-Zhang-122507/racelimit-live)" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -45,12 +45,12 @@ for (const file of readdirSync(TRACKS).filter((f) => f.endsWith(".json"))) {
   const t = JSON.parse(readFileSync(path, "utf8"));
   if (t.cv === VERSION && !force) continue;
   // a circuit that didn't work is tried again after a week, not every hour
-  if (t.cvMiss && Date.now() - Date.parse(t.cvMiss.at) < 7 * 864e5 && !force) continue;
-  const miss = (why) => { console.log(`${t.circuit}: ${why}`); t.cvMiss = { at: new Date().toISOString(), why }; writeFileSync(path, JSON.stringify(t)); };
+  if (t.cvMiss?.v === VERSION && Date.now() - Date.parse(t.cvMiss.at) < 7 * 864e5 && !force) continue;
+  const miss = (why) => { console.log(`${t.circuit}: ${why}`); t.cvMiss = { at: new Date().toISOString(), why, v: VERSION }; writeFileSync(path, JSON.stringify(t)); };
   const key = keys[t.circuit];
   if (!key) { miss("no circuit key"); continue; }
   let mv = null;
-  for (const y of [YEAR, YEAR - 1, YEAR - 2, YEAR - 3]) { mv = await json(`https://api.multiviewer.app/api/v1/circuits/${key}/${y}`); await sleep(800); if (mv?.x?.length) break; }
+  for (let y = YEAR; y >= 2017; y--) { mv = await json(`https://api.multiviewer.app/api/v1/circuits/${key}/${y}`); await sleep(800); if (mv?.x?.length) break; }
   if (!mv?.x?.length) { miss(`no circuit info for key ${key}`); continue; }
 
   // MultiViewer's x/y are F1 position coordinates; flip y like the outline and fit a 0–1000 box
@@ -63,7 +63,20 @@ for (const file of readdirSync(TRACKS).filter((f) => f.endsWith(".json"))) {
   const ours = t.points.map(([x, y]) => [((x - ob.minX) / ob.size) * 1000, ((y - ob.minY) / ob.size) * 1000]);
   const theirs = raw.filter((_, i) => i % 4 === 0).map(([x, y]) => norm(x, y));
   const err = theirs.reduce((a, p) => a + Math.min(...ours.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))), 0) / theirs.length;
-  if (err > 25) { miss(`shapes don't line up (off by ${err.toFixed(1)}, key ${key})`); continue; }
+  if (err > 25) {
+    // our outline came from a lap with patchy position data: use theirs instead, starting at
+    // the line (where ours starts) and running the way the corners are numbered
+    const all = raw.map(([x, y]) => norm(x, y));
+    const start = [((t.points[0][0] - ob.minX) / ob.size) * 1000, ((t.points[0][1] - ob.minY) / ob.size) * 1000];
+    const near = (pt, list) => list.reduce((bi, q, i) => (Math.hypot(q[0] - pt[0], q[1] - pt[1]) < Math.hypot(list[bi][0] - pt[0], list[bi][1] - pt[1]) ? i : bi), 0);
+    let loop = [...all.slice(near(start, all)), ...all.slice(0, near(start, all))];
+    const c1 = mv.corners?.find((c) => c.number === 1);
+    if (c1 && near(norm(c1.trackPosition.x, c1.trackPosition.y), loop) > loop.length / 2) loop = [loop[0], ...loop.slice(1).reverse()];
+    const step = Math.max(1, Math.floor(loop.length / 400));
+    t.points = loop.filter((_, i) => i % step === 0);
+    t.outlineFrom = "multiviewer";
+    console.log(`${t.circuit}: our outline was off by ${err.toFixed(1)} — replaced with theirs (${t.points.length} points)`);
+  }
 
   t.corners = (mv.corners ?? []).map((c) => ({ n: c.number, l: c.letter || "", p: norm(c.trackPosition.x, c.trackPosition.y) }));
   t.marshal = (mv.marshalSectors ?? []).map((m) => ({ n: m.number, p: norm(m.trackPosition.x, m.trackPosition.y) }));
