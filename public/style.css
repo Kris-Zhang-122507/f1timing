@@ -168,6 +168,10 @@ footer { text-align: center; }
 .tabs { display: flex; gap: 4px; padding: 4px; background: var(--card); border-radius: 10px; align-self: flex-start; flex-wrap: wrap; }
 .tabs button { min-height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); font: 600 15px "Barlow", sans-serif; cursor: pointer; }
 .tabs button.on { background: #262B36; color: var(--text); }
+.tabs .tab-link { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 12px; border-radius: 4px; color: var(--accent-soft); font: 600 14px "Barlow", sans-serif; text-decoration: none; }
+.tabs .tab-link:hover { background: #1C2029; }
+.tabs .tab-link span { font-size: 11px; opacity: .7; }
+.tabs .tab-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* circle of doom */
 .circle-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
