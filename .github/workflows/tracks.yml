@@ -1,0 +1,40 @@
+# Corner numbers and marshal sectors (where yellow flags are) for every circuit outline.
+# Runs when the script changes, once a week, or by hand. The hourly archive job also runs it
+# for any circuit that's new.
+name: Track details
+
+on:
+  push:
+    branches: [main]
+    paths: [scripts/corners.mjs]
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tracks
+  cancel-in-progress: false
+
+jobs:
+  corners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch corners and marshal sectors
+        run: node scripts/corners.mjs
+      - name: Save
+        run: |
+          git config user.name "racelimit-archive"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/data/tracks
+          if git diff --cached --quiet; then echo "Nothing new."; else
+            git commit -m "Tracks: corner numbers and marshal sectors"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done
+          fi

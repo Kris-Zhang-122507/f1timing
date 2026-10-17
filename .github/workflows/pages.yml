@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   # the archive job pushes with the built-in token, which doesn't trigger "push" runs
   workflow_run:
-    workflows: ["Archive sessions", "Technical documents"]
+    workflows: ["Archive sessions", "Technical documents", "Track details"]
     types: [completed]
 
 permissions:
