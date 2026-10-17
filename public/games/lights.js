@@ -1,6 +1,7 @@
 // Lights Out: five red lights come on one a second, hold for a random moment, then go out.
 // React as fast as you can. Too early is a jump start.
-import { load, save } from "./common.js?v=1";
+import { load, save } from "./common.js?v=mvbx25sl";
+import { sfx } from "./sfx.js?v=mvbx25sl";
 
 const VERDICTS = [
   [150, "Lightning! That's F1 level — or a very good guess", "good"],
@@ -41,7 +42,7 @@ export function mountLights(root) {
     state = "lighting";
     setLights(0);
     message(`<div class="lo-verdict muted">Get ready…</div>`);
-    for (let k = 1; k <= 5; k++) timers.push(setTimeout(() => setLights(k), 700 + (k - 1) * 1000));
+    for (let k = 1; k <= 5; k++) timers.push(setTimeout(() => { setLights(k); sfx.light(); }, 700 + (k - 1) * 1000));
     const hold = 200 + Math.random() * 2800; // like the real thing: you can't predict it
     timers.push(setTimeout(() => {
       state = "holding";
@@ -58,12 +59,15 @@ export function mountLights(root) {
       stats.jumps = (stats.jumps ?? 0) + 1;
       stats.history = [{ jump: true }, ...(stats.history ?? [])].slice(0, 12);
       setLights(0);
+      sfx.buzz();
       message(`<div class="lo-time bad">JUMP START</div><div class="lo-verdict">${ms != null ? "Under 0.1s — that was a guess, not a reaction" : "You went before the lights went out"} · drive-through penalty</div><div class="muted small">Tap or press Space to try again</div>`);
     } else {
       const isBest = !stats.best || ms < stats.best;
       if (isBest) stats.best = ms;
       stats.history = [{ ms }, ...(stats.history ?? [])].slice(0, 12);
       const [, text, cls] = VERDICTS.find(([lim]) => ms < lim);
+      sfx.launch();
+      if (isBest && stats.runs > 1) setTimeout(sfx.fanfare, 450);
       message(`<div class="lo-time ${cls}">${(ms / 1000).toFixed(3)}s</div><div class="lo-verdict">${isBest && stats.runs > 1 ? "New personal best! " : ""}${text}</div><div class="muted small">Tap or press Space to go again</div>`);
     }
     save("lights", stats);

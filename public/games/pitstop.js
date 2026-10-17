@@ -3,7 +3,8 @@
 //   2. change all four tyres: each wheel = gun off, then gun on with the new tyre fitted
 //   3. release the car when the light goes green (go early and it's an unsafe release)
 // The light only turns green once the jacks are down. The time is the stationary time, from the car stopping to the release, plus any penalties.
-import { load, save, share } from "./common.js?v=1";
+import { load, save, share } from "./common.js?v=mvbx25sl";
+import { sfx } from "./sfx.js?v=mvbx25sl";
 
 const W = 900, H = 400;
 const TARGET = 450;            // where the car's middle should stop
@@ -76,6 +77,7 @@ export function mountPit(root) {
   const ro = new ResizeObserver(fit); ro.observe($("psStage")); fit();
 
   let phase = "ready";   // ready → driving → stationary → release → done
+  let stopHum = () => {};
   let x = -220, raf = 0, last = 0, tStop = 0, tEnd = 0, wheels = [], penalties = [], greenAt = 0;
   const now = () => performance.now();
 
@@ -85,7 +87,7 @@ export function mountPit(root) {
   function drawWheels() { wheelEls.forEach((el, i) => { const w = wheels[i]; el.setAttribute("class", `wheel ${w?.state ?? ""} ${phase === "stationary" && (w?.state === "on" || w?.state === "new") ? "ready" : ""}`); }); }
 
   function reset() {
-    cancelAnimationFrame(raf);
+    cancelAnimationFrame(raf); stopHum();
     phase = "ready"; x = -220; penalties = []; wheels = WHEELS.map(() => ({ state: "on" })); setCar(); setLight("red");
     $("psClock").textContent = "0.00"; $("psResult").hidden = true;
     phaseText("Pit entry", "Press <kbd>Start</kbd> — the car comes down the pit lane. Hit <kbd>Space</kbd> or <b>STOP</b> to stop it on the marks.", ["Start", false]);
@@ -93,7 +95,7 @@ export function mountPit(root) {
   }
 
   function drive() {
-    phase = "driving"; last = now();
+    phase = "driving"; last = now(); stopHum = sfx.limiter();
     phaseText("Pit limiter on", "Stop on the marks!", ["STOP", false]);
     const step = (t) => {
       x += (SPEED * (t - last)) / 1000; last = t; setCar();
@@ -105,6 +107,7 @@ export function mountPit(root) {
 
   function stopCar(overran) {
     cancelAnimationFrame(raf);
+    stopHum(); sfx.brake(); setTimeout(sfx.clunk, 90);
     const err = overran ? Infinity : Math.abs(x - TARGET);
     if (overran) { x = TARGET + 120; setCar(); penalties.push(["Overshot the box — the crew had to run to the car", 3000]); }
     else if (err > 70) penalties.push([`Missed the marks by ${Math.round(err / 4)} cm — crew had to move`, 2500]);
@@ -125,20 +128,21 @@ export function mountPit(root) {
   function hitWheel(i) {
     if (phase !== "stationary") return;
     const w = wheels[i];
-    if (w.state === "on") { w.state = "off"; w.at = now(); drawWheels(); setTimeout(() => { if (w.state === "off") { w.state = "new"; drawWheels(); } }, SWAP); return; }
+    if (w.state === "on") { sfx.gun(); w.state = "off"; w.at = now(); drawWheels(); setTimeout(() => { if (w.state === "off") { w.state = "new"; drawWheels(); } }, SWAP); return; }
     if (w.state === "off") { // gun on before the new tyre is there: fumble
       penalties.push([`Fumbled the ${WHEELS[i].name} wheel`, 300]);
+      sfx.thud();
       const el = wheelEls[i]; el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 200);
       return;
     }
     if (w.state === "new") {
-      w.state = "done"; drawWheels();
-      if (wheels.every((v) => v.state === "done")) { phase = "jacks"; phaseText("Jacks down…", "Wait for green!", ["GO", false]); setTimeout(() => { if (phase === "jacks") green(); }, JACKS); }
+      w.state = "done"; sfx.gun(); drawWheels();
+      if (wheels.every((v) => v.state === "done")) { setTimeout(sfx.clunk, JACKS - 60); phase = "jacks"; phaseText("Jacks down…", "Wait for green!", ["GO", false]); setTimeout(() => { if (phase === "jacks") green(); }, JACKS); }
     }
   }
 
   function green() {
-    phase = "release"; greenAt = now(); setLight("green");
+    phase = "release"; greenAt = now(); setLight("green"); sfx.go();
     phaseText("Go go go!", "Release the car!", ["GO", false]);
     drawWheels();
   }
@@ -148,6 +152,7 @@ export function mountPit(root) {
     if (phase === "jacks") penalties.push(["Unsafe release — went before the green light", 5000]);
     cancelAnimationFrame(raf);
     tEnd = now(); phase = "done"; setLight("red");
+    if (penalties.some(([t]) => t.startsWith("Unsafe"))) sfx.buzz(); else sfx.launch();
     const stationary = Math.round(tEnd - tStop);
     const pen = penalties.reduce((a, [, ms]) => a + ms, 0);
     const total = stationary + pen;
@@ -161,6 +166,7 @@ export function mountPit(root) {
     saved.history = [total, ...(saved.history ?? [])].slice(0, 10);
     save("pit", saved);
     const verdict = VERDICTS.find(([lim]) => total < lim)[1];
+    if (isBest && saved.history.length > 1) setTimeout(sfx.fanfare, 500);
     $("psResult").hidden = false;
     $("psResult").innerHTML = `<div class="stats"><div class="stat"><b style="font-size:30px">${(total / 1000).toFixed(2)}s</b><span>Your stop${isBest && saved.history.length > 1 ? " · new best!" : ""}</span></div></div>
       <div class="lo-verdict" style="font:600 20px 'Barlow Condensed',sans-serif">${verdict}</div>
@@ -202,5 +208,5 @@ export function mountPit(root) {
   addEventListener("keydown", onKey);
   reset();
   drawStats();
-  return () => { cancelAnimationFrame(raf); ro.disconnect(); removeEventListener("keydown", onKey); };
+  return () => { cancelAnimationFrame(raf); stopHum(); ro.disconnect(); removeEventListener("keydown", onKey); };
 }

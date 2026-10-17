@@ -31,6 +31,8 @@ h2 { font-size: 22px; font-weight: 600; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #17120A; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.ghost { background: none; }
+.btn.icon { padding: 0; width: 44px; }
+.btn.icon[aria-pressed="false"] { color: var(--faint); }
 .btn:focus-visible, .wheel:focus-visible, .card-link:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn:disabled { opacity: .45; cursor: default; }
 

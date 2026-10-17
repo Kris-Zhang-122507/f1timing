@@ -1,7 +1,8 @@
 // Guess the Track: a real circuit outline (the same shapes as the live track map) is revealed a
 // little more after every wrong guess. Six guesses. One puzzle a day, the same for everyone, plus
 // practice rounds. Wrong guesses tell you how far away the right circuit is, and which way.
-import { load, save, esc, share } from "./common.js?v=1";
+import { load, save, esc, share } from "./common.js?v=mvbx25sl";
+import { sfx } from "./sfx.js?v=mvbx25sl";
 
 // slug (file in data/tracks) → name, country, flag, where it is, and other names people might type
 const CIRCUITS = [
@@ -112,11 +113,12 @@ export function mountTrack(root) {
     if (done) return;
     const c = find(text);
     const form = root.querySelector("#trForm"), note = root.querySelector("#trNote");
-    if (!c) { form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake"); note.textContent = "That's not one of the circuits — pick one from the list."; return; }
+    if (!c) { sfx.thud(); form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake"); note.textContent = "That's not one of the circuits — pick one from the list."; return; }
     if (guesses.includes(c.slug)) { note.textContent = `You've already guessed ${c.name}.`; return; }
     guesses.push(c.slug);
-    if (c.slug === answer.slug) { done = true; won = true; }
-    else if (guesses.length >= MAX) { done = true; won = false; }
+    if (c.slug === answer.slug) { done = true; won = true; sfx.fanfare(); }
+    else if (guesses.length >= MAX) { done = true; won = false; sfx.buzz(); }
+    else sfx.thud();
     persist();
     if (done) record();
     draw();
